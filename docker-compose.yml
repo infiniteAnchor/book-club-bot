@@ -1,0 +1,9 @@
+services:
+  book-club-bot:
+    build: .
+    container_name: book-club-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data

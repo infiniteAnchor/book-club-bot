@@ -1,0 +1,625 @@
+{
+  "cases": [
+    {
+      "message": "I finished Dune last night",
+      "expected_action": "finish_book",
+      "context": {
+        "books": [
+          {
+            "title": "Dune",
+            "author": "Frank Herbert",
+            "status": "reading",
+            "progress_raw": 150,
+            "progress_unit": "pages"
+          }
+        ]
+      },
+      "raw": "```json\n{\n    \"action\": \"finish_book\",\n    \"args\": {\"title\": \"Dune\", \"author\": \"Frank Herbert\"},\n    \"response\": \"🎉 Awesome! You finished **Dune** by Frank Herbert! How was your journey through Arrakis? Would you like to rate it, or jump into a spoiler-safe discussion thread with the group?\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "finish_book",
+        "args": {
+          "title": "Dune",
+          "author": "Frank Herbert"
+        },
+        "response": "🎉 Awesome! You finished **Dune** by Frank Herbert! How was your journey through Arrakis? Would you like to rate it, or jump into a spoiler-safe discussion thread with the group?",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Just finished reading The Road",
+      "expected_action": "finish_book",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"finish_book\",\n    \"args\": {\n        \"title\": \"The Road\",\n        \"author\": \"\"\n    },\n    \"response\": \"Awesome! You've finished **The Road** by Cormac McCarthy. What did you think of it? Feel free to rate it, and if you'd like to share your thoughts with the club, I can help you open a spoiler-safe discussion thread. 📚\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "finish_book",
+        "args": {
+          "title": "The Road",
+          "author": ""
+        },
+        "response": "Awesome! You've finished **The Road** by Cormac McCarthy. What did you think of it? Feel free to rate it, and if you'd like to share your thoughts with the club, I can help you open a spoiler-safe discussion thread. 📚",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "I'm on page 200 of Dune",
+      "expected_action": "update_progress",
+      "context": {
+        "books": [
+          {
+            "title": "Dune",
+            "author": "Frank Herbert",
+            "status": "reading",
+            "progress_raw": 150,
+            "progress_unit": "pages"
+          }
+        ]
+      },
+      "raw": "```json\n{\n    \"action\": \"update_progress\",\n    \"args\": {\"title\": \"Dune\", \"author\": \"Frank Herbert\", \"progress\": 200, \"unit\": \"pages\"},\n    \"response\": \"Great progress on **Dune**! You've moved from page 150 to page 200—50 pages in! You're diving deeper into Arrakis. Keep that momentum going! 📖\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "update_progress",
+        "args": {
+          "title": "Dune",
+          "author": "Frank Herbert",
+          "progress": 200,
+          "unit": "pages"
+        },
+        "response": "Great progress on **Dune**! You've moved from page 150 to page 200—50 pages in! You're diving deeper into Arrakis. Keep that momentum going! 📖",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Updated my progress — halfway through Foundation",
+      "expected_action": "update_progress",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"update_progress\",\n    \"args\": {\"title\": \"Foundation\", \"progress\": \"50%\"},\n    \"response\": \"Great progress! You're halfway through Foundation. Keep it up! 📖\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "update_progress",
+        "args": {
+          "title": "Foundation",
+          "progress": "50%"
+        },
+        "response": "Great progress! You're halfway through Foundation. Keep it up! 📖",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Add Ender's Game to my shelf",
+      "expected_action": "add_book",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"add_book\",\n    \"args\": {\n        \"title\": \"Ender's Game\",\n        \"author\": \"\"\n    },\n    \"response\": \"📚 Added **Ender's Game** to your shelf! Which shelf would you like it on—currently reading, finished, or wishlist?\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "add_book",
+        "args": {
+          "title": "Ender's Game",
+          "author": ""
+        },
+        "response": "📚 Added **Ender's Game** to your shelf! Which shelf would you like it on—currently reading, finished, or wishlist?",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Start reading Neuromancer",
+      "expected_action": "start_book",
+      "context": {},
+      "raw": "```json\n{\n  \"action\": \"start_book\",\n  \"args\": {\n    \"title\": \"Neuromancer\",\n    \"author\": \"\"\n  },\n  \"response\": \"🚀 You've started **Neuromancer**! Jump into the cyberpunk world of Case and Molly. This is a classic—enjoy the ride, and feel free to log your progress as you go. Let me know when you finish or if you want to chat about it!\",\n  \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "start_book",
+        "args": {
+          "title": "Neuromancer",
+          "author": ""
+        },
+        "response": "🚀 You've started **Neuromancer**! Jump into the cyberpunk world of Case and Molly. This is a classic—enjoy the ride, and feel free to log your progress as you go. Let me know when you finish or if you want to chat about it!",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Add The Name of the Wind to my wishlist",
+      "expected_action": "add_to_wishlist",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"add_to_wishlist\",\n    \"args\": {\n        \"title\": \"The Name of the Wind\",\n        \"author\": \"Patrick Rothfuss\"\n    },\n    \"response\": \"Added **The Name of the Wind** by Patrick Rothfuss to your wishlist! 📚 Great choice—this is a fantastic epic fantasy. Let me know when you're ready to start it!\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "add_to_wishlist",
+        "args": {
+          "title": "The Name of the Wind",
+          "author": "Patrick Rothfuss"
+        },
+        "response": "Added **The Name of the Wind** by Patrick Rothfuss to your wishlist! 📚 Great choice—this is a fantastic epic fantasy. Let me know when you're ready to start it!",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "I want to read Snow Crash someday",
+      "expected_action": "add_to_wishlist",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"add_to_wishlist\",\n    \"args\": {\n        \"title\": \"Snow Crash\",\n        \"author\": \"Neal Stephenson\"\n    },\n    \"response\": \"Added **Snow Crash** by Neal Stephenson to your wishlist! It's a classic cyberpunk novel—definitely a great one to have on your radar. Let me know when you're ready to dive in! 🚀\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "add_to_wishlist",
+        "args": {
+          "title": "Snow Crash",
+          "author": "Neal Stephenson"
+        },
+        "response": "Added **Snow Crash** by Neal Stephenson to your wishlist! It's a classic cyberpunk novel—definitely a great one to have on your radar. Let me know when you're ready to dive in! 🚀",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Rate Dune a 9 out of 10",
+      "expected_action": "rate_book",
+      "context": {
+        "books": [
+          {
+            "title": "Dune",
+            "author": "Frank Herbert",
+            "status": "reading",
+            "progress_raw": 150,
+            "progress_unit": "pages"
+          }
+        ]
+      },
+      "raw": "```json\n{\n    \"action\": \"rate_book\",\n    \"args\": {\n        \"title\": \"Dune\",\n        \"author\": \"Frank Herbert\",\n        \"rating\": 9\n    },\n    \"response\": \"Awesome! I've logged your 9/10 rating for **Dune** by Frank Herbert. That's a stellar score—sounds like Frank Herbert really delivered an epic experience! 📖✨\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "rate_book",
+        "args": {
+          "title": "Dune",
+          "author": "Frank Herbert",
+          "rating": 9
+        },
+        "response": "Awesome! I've logged your 9/10 rating for **Dune** by Frank Herbert. That's a stellar score—sounds like Frank Herbert really delivered an epic experience! 📖✨",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Give Foundation 7/10",
+      "expected_action": "rate_book",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"rate_book\",\n    \"args\": {\n        \"title\": \"Foundation\",\n        \"rating\": 7\n    },\n    \"response\": \"Got it! You've rated **Foundation** a solid 7/10. That's a great classic sci-fi pick. What did you think of it—any particular aspects that stood out to you?\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "rate_book",
+        "args": {
+          "title": "Foundation",
+          "rating": 7
+        },
+        "response": "Got it! You've rated **Foundation** a solid 7/10. That's a great classic sci-fi pick. What did you think of it—any particular aspects that stood out to you?",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "I gave up on Moby Dick, it's not for me",
+      "expected_action": "dnf_book",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"dnf_book\",\n    \"args\": {\n        \"title\": \"Moby Dick\",\n        \"author\": \"Herman Melville\"\n    },\n    \"response\": \"No worries! *Moby Dick* is a tough one—whaling logs and philosophical digressions aren't everyone's cup of tea. Thanks for giving it a shot. What kind of books *do* grab you? I can suggest something more up your alley if you'd like! 📚\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "dnf_book",
+        "args": {
+          "title": "Moby Dick",
+          "author": "Herman Melville"
+        },
+        "response": "No worries! *Moby Dick* is a tough one—whaling logs and philosophical digressions aren't everyone's cup of tea. Thanks for giving it a shot. What kind of books *do* grab you? I can suggest something more up your alley if you'd like! 📚",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Abandoning The Silmarillion, too dense",
+      "expected_action": "dnf_book",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"dnf_book\",\n    \"args\": {\n        \"title\": \"The Silmarillion\",\n        \"author\": \"J.R.R. Tolkien\"\n    },\n    \"response\": \"No shame in that—*The Silmarillion* is notoriously dense and mythological. It's definitely not for everyone! What kind of vibe are you looking for next? Something lighter, faster-paced, or still in fantasy but more accessible?\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "dnf_book",
+        "args": {
+          "title": "The Silmarillion",
+          "author": "J.R.R. Tolkien"
+        },
+        "response": "No shame in that—*The Silmarillion* is notoriously dense and mythological. It's definitely not for everyone! What kind of vibe are you looking for next? Something lighter, faster-paced, or still in fantasy but more accessible?",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "DNF on War and Peace",
+      "expected_action": "dnf_book",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"dnf_book\",\n    \"args\": {\n        \"title\": \"War and Peace\"\n    },\n    \"response\": \"Got it—you've decided to DNF **War and Peace**. No judgment here; that's a commitment! Your shelf has been updated. Want a recommendation for something lighter, or are you sticking with something you're already reading?\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "dnf_book",
+        "args": {
+          "title": "War and Peace"
+        },
+        "response": "Got it—you've decided to DNF **War and Peace**. No judgment here; that's a commitment! Your shelf has been updated. Want a recommendation for something lighter, or are you sticking with something you're already reading?",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "What am I currently reading?",
+      "expected_action": "query",
+      "context": {
+        "books": [
+          {
+            "title": "Dune",
+            "author": "Frank Herbert",
+            "status": "reading",
+            "progress_raw": 150,
+            "progress_unit": "pages"
+          }
+        ]
+      },
+      "raw": "```json\n{\n    \"action\": \"query\",\n    \"args\": {},\n    \"response\": \"You're currently reading **Dune** by Frank Herbert! You're 150 pages in. How's it going so far?\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "query",
+        "args": {},
+        "response": "You're currently reading **Dune** by Frank Herbert! You're 150 pages in. How's it going so far?",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Show my finished books",
+      "expected_action": "query",
+      "context": {
+        "books": [
+          {
+            "title": "Dune",
+            "author": "Frank Herbert",
+            "status": "reading",
+            "progress_raw": 150,
+            "progress_unit": "pages"
+          }
+        ]
+      },
+      "raw": "```json\n{\n    \"action\": \"query\",\n    \"args\": {},\n    \"response\": \"You haven't finished any books yet! You're currently reading **Dune** by Frank Herbert (150 pages in). Keep going—you're on your way! 📚\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "query",
+        "args": {},
+        "response": "You haven't finished any books yet! You're currently reading **Dune** by Frank Herbert (150 pages in). Keep going—you're on your way! 📚",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "What's everyone reading?",
+      "expected_action": "group_query",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"group_query\",\n    \"args\": {},\n    \"response\": \"Let me pull up what everyone in the club is currently reading! 📚\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "group_query",
+        "args": {},
+        "response": "Let me pull up what everyone in the club is currently reading! 📚",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Show everyone's shelf",
+      "expected_action": "group_query",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"group_query\",\n    \"args\": {},\n    \"response\": \"I'll pull up what everyone in the book club is currently reading, has finished, and has on their wishlist. Give me a moment to gather that info!\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "group_query",
+        "args": {},
+        "response": "I'll pull up what everyone in the book club is currently reading, has finished, and has on their wishlist. Give me a moment to gather that info!",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "What should I read next?",
+      "expected_action": "recommend",
+      "context": {
+        "books": [
+          {
+            "title": "Dune",
+            "author": "Frank Herbert",
+            "status": "reading",
+            "progress_raw": 150,
+            "progress_unit": "pages"
+          }
+        ]
+      },
+      "raw": "```json\n{\n    \"action\": \"recommend\",\n    \"args\": {},\n    \"response\": \"I'd love to help you find your next read! 📚 Since you're currently working through **Dune**, are you looking for something similar—like epic sci-fi or worldbuilding-heavy fantasy? Or would you prefer something completely different to mix things up? Let me know your mood or favorite genres, and I can suggest some great options!\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "recommend",
+        "args": {},
+        "response": "I'd love to help you find your next read! 📚 Since you're currently working through **Dune**, are you looking for something similar—like epic sci-fi or worldbuilding-heavy fantasy? Or would you prefer something completely different to mix things up? Let me know your mood or favorite genres, and I can suggest some great options!",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Recommend something similar to Dune",
+      "expected_action": "recommend",
+      "context": {
+        "books": [
+          {
+            "title": "Dune",
+            "author": "Frank Herbert",
+            "status": "reading",
+            "progress_raw": 150,
+            "progress_unit": "pages"
+          }
+        ]
+      },
+      "raw": "```json\n{\n    \"action\": \"recommend\",\n    \"args\": {\n        \"similar_to\": \"Dune\"\n    },\n    \"response\": \"Based on your love of *Dune*, here are some epic sci-fi recommendations you might enjoy:\\n\\n📚 **The Expanse series** by James S.A. Corey — political intrigue, space opera, and complex worldbuilding\\n📚 **Foundation** by Isaac Asimov — grand-scale science fiction with empire-building and strategic depth\\n📚 **Altered Carbon** by Richard K. Morgan — immersive sci-fi with darker themes and intricate plots\\n📚 **Hyperion** by Dan Simmons — sweeping space opera with rich mythology and interconnected narratives\\n📚 **Leviathan Wakes** by James S.A. Corey (The Expanse #1) — if you want to jump straight in!\\n\\nAll of these have that same sense of **epic scope, political complexity, and intricate worldbuilding** that makes *Dune* so captivating. Since you're currently reading *Dune*, I'd say finish it first—but one of these would be a perfect follow-up! 🚀\\n\\nWould any of these appeal to you?\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "recommend",
+        "args": {
+          "similar_to": "Dune"
+        },
+        "response": "Based on your love of *Dune*, here are some epic sci-fi recommendations you might enjoy:\n\n📚 **The Expanse series** by James S.A. Corey — political intrigue, space opera, and complex worldbuilding\n📚 **Foundation** by Isaac Asimov — grand-scale science fiction with empire-building and strategic depth\n📚 **Altered Carbon** by Richard K. Morgan — immersive sci-fi with darker themes and intricate plots\n📚 **Hyperion** by Dan Simmons — sweeping space opera with rich mythology and interconnected narratives\n📚 **Leviathan Wakes** by James S.A. Corey (The Expanse #1) — if you want to jump straight in!\n\nAll of these have that same sense of **epic scope, political complexity, and intricate worldbuilding** that makes *Dune* so captivating. Since you're currently reading *Dune*, I'd say finish it first—but one of these would be a perfect follow-up! 🚀\n\nWould any of these appeal to you?",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Give me something light and fun",
+      "expected_action": "recommend",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"recommend\",\n    \"args\": {\"mood\": \"light and fun\"},\n    \"response\": \"I'd love to help you find something light and fun to read! 📚✨ Are you looking for a specific genre—like a cozy mystery, rom-com, humorous fiction, or something else? Or any books you've enjoyed before that had that vibe? That'll help me narrow down the perfect pick for you!\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "recommend",
+        "args": {
+          "mood": "light and fun"
+        },
+        "response": "I'd love to help you find something light and fun to read! 📚✨ Are you looking for a specific genre—like a cozy mystery, rom-com, humorous fiction, or something else? Or any books you've enjoyed before that had that vibe? That'll help me narrow down the perfect pick for you!",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "I want something that will wreck me emotionally",
+      "expected_action": "recommend",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"recommend\",\n    \"args\": {\"mood\": \"emotionally devastating\"},\n    \"response\": \"Oh, you want something that'll hit you right in the feels! 📖💔 I can suggest some real tear-jerkers and emotionally intense reads that will absolutely wreck you in the best way. To give you the best recommendations, tell me:\\n\\n• **What genres do you usually enjoy?** (literary fiction, contemporary, historical, fantasy, etc.)\\n• **Have you read anything recently that really got to you?** (helps me understand your taste)\\n• **Any topics or themes you want to avoid** while you're seeking this emotional rollercoaster?\\n\\nLet me know and I'll hook you up with something that'll have you ugly-crying into your book! 😭\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "recommend",
+        "args": {
+          "mood": "emotionally devastating"
+        },
+        "response": "Oh, you want something that'll hit you right in the feels! 📖💔 I can suggest some real tear-jerkers and emotionally intense reads that will absolutely wreck you in the best way. To give you the best recommendations, tell me:\n\n• **What genres do you usually enjoy?** (literary fiction, contemporary, historical, fantasy, etc.)\n• **Have you read anything recently that really got to you?** (helps me understand your taste)\n• **Any topics or themes you want to avoid** while you're seeking this emotional rollercoaster?\n\nLet me know and I'll hook you up with something that'll have you ugly-crying into your book! 😭",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "I want to read 20 books this year",
+      "expected_action": "set_goal",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"set_goal\",\n    \"args\": {\"goal\": 20},\n    \"response\": \"Nice! I've set your reading goal to 20 books for the year. 📚 That's an ambitious target—I'll help you track your progress. Let me know when you start a new book, finish one, or want to check how you're doing toward that goal!\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "set_goal",
+        "args": {
+          "goal": 20
+        },
+        "response": "Nice! I've set your reading goal to 20 books for the year. 📚 That's an ambitious target—I'll help you track your progress. Let me know when you start a new book, finish one, or want to check how you're doing toward that goal!",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "My reading goal is 12 books",
+      "expected_action": "set_goal",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"set_goal\",\n    \"args\": {\"goal\": 12},\n    \"response\": \"Great! I've set your reading goal to 12 books. That's a solid target—let me know how you're tracking throughout the year, and I'll cheer you on! 📚\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "set_goal",
+        "args": {
+          "goal": 12
+        },
+        "response": "Great! I've set your reading goal to 12 books. That's a solid target—let me know how you're tracking throughout the year, and I'll cheer you on! 📚",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "How am I tracking on my reading goal?",
+      "expected_action": "check_goal",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"check_goal\",\n    \"args\": {},\n    \"response\": \"I'll check your reading goal progress for you! Let me see how many books you've finished so far and what your target is.\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "check_goal",
+        "args": {},
+        "response": "I'll check your reading goal progress for you! Let me see how many books you've finished so far and what your target is.",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Show the leaderboard",
+      "expected_action": "leaderboard",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"leaderboard\",\n    \"args\": {},\n    \"response\": \"📊 Pulling up the leaderboard for you! This shows who's been crushing their reading goals and leading the pack.\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "leaderboard",
+        "args": {},
+        "response": "📊 Pulling up the leaderboard for you! This shows who's been crushing their reading goals and leading the pack.",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Who's read the most books?",
+      "expected_action": "leaderboard",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"leaderboard\",\n    \"args\": {},\n    \"response\": \"Let me pull up the leaderboard to see who's read the most books! 📚\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "leaderboard",
+        "args": {},
+        "response": "Let me pull up the leaderboard to see who's read the most books! 📚",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Nominate The Road by Cormac McCarthy",
+      "expected_action": "nominate",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"nominate\",\n    \"args\": {\n        \"title\": \"The Road\",\n        \"author\": \"Cormac McCarthy\"\n    },\n    \"response\": \"Great pick! I've logged your nomination for **The Road** by Cormac McCarthy. If nominations are open, your vote is in. Once voting opens, you'll be able to cast your ballot. Good luck! 📚\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "nominate",
+        "args": {
+          "title": "The Road",
+          "author": "Cormac McCarthy"
+        },
+        "response": "Great pick! I've logged your nomination for **The Road** by Cormac McCarthy. If nominations are open, your vote is in. Once voting opens, you'll be able to cast your ballot. Good luck! 📚",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "I nominate Ender's Game because it's a classic",
+      "expected_action": "nominate",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"nominate\",\n    \"args\": {\n        \"title\": \"Ender's Game\",\n        \"reason\": \"it's a classic\"\n    },\n    \"response\": \"Great pick! I've logged your nomination of **Ender's Game** with the reason: *it's a classic*. That's definitely a beloved sci-fi staple. Your vote is in! 📚\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "nominate",
+        "args": {
+          "title": "Ender's Game",
+          "reason": "it's a classic"
+        },
+        "response": "Great pick! I've logged your nomination of **Ender's Game** with the reason: *it's a classic*. That's definitely a beloved sci-fi staple. Your vote is in! 📚",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Open nominations for the next book",
+      "expected_action": "open_nominations",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"open_nominations\",\n    \"args\": {},\n    \"response\": \"📚 Nominations are now open! Start suggesting books for the next club pick. Use the nominate command to throw your recommendations in the ring. Happy suggesting!\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "open_nominations",
+        "args": {},
+        "response": "📚 Nominations are now open! Start suggesting books for the next club pick. Use the nominate command to throw your recommendations in the ring. Happy suggesting!",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Show the current nominations",
+      "expected_action": "list_nominations",
+      "context": {},
+      "raw": "```json\n{\n  \"action\": \"list_nominations\",\n  \"args\": {},\n  \"response\": \"I'll pull up the current nominations for you!\",\n  \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "list_nominations",
+        "args": {},
+        "response": "I'll pull up the current nominations for you!",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Give us a weekly recap",
+      "expected_action": "summarize",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"summarize\",\n    \"args\": {},\n    \"response\": \"I'll pull together a weekly recap of what everyone's been reading and how the club is doing. Give me a moment to gather all the activity! 📚\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "summarize",
+        "args": {},
+        "response": "I'll pull together a weekly recap of what everyone's been reading and how the club is doing. Give me a moment to gather all the activity! 📚",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "How was our reading year?",
+      "expected_action": "year_in_review",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"year_in_review\",\n    \"args\": {},\n    \"response\": \"I'll pull together a recap of your book club's reading year! Let me gather the stats on books read, genres explored, top picks, and how everyone's doing. 📚✨\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "year_in_review",
+        "args": {},
+        "response": "I'll pull together a recap of your book club's reading year! Let me gather the stats on books read, genres explored, top picks, and how everyone's doing. 📚✨",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Join the book club",
+      "expected_action": "manage_membership",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"manage_membership\",\n    \"args\": {\"operation\": \"join\"},\n    \"response\": \"Welcome to the book club! 📚 You're on the Tracking tier, so you can add books, log your progress, and rate what you've finished. If you want recap pings or nominations and polls, just ask to upgrade your tier!\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "manage_membership",
+        "args": {
+          "operation": "join"
+        },
+        "response": "Welcome to the book club! 📚 You're on the Tracking tier, so you can add books, log your progress, and rate what you've finished. If you want recap pings or nominations and polls, just ask to upgrade your tier!",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Join the book club and send me nudges",
+      "expected_action": "manage_membership",
+      "context": {},
+      "raw": "```json\n{\n  \"action\": \"manage_membership\",\n  \"args\": {\n    \"operation\": \"join\",\n    \"tier\": \"tracking\"\n  },\n  \"response\": \"You're in! 📚 You're on the Tracking tier. Reading nudge DMs are a separate toggle that needs Tracking, which you now have—just say the word and I'll turn them on for you.\",\n  \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "manage_membership",
+        "args": {
+          "operation": "join",
+          "tier": "tracking"
+        },
+        "response": "You're in! 📚 You're on the Tracking tier. Reading nudge DMs are a separate toggle that needs Tracking, which you now have—just say the word and I'll turn them on for you.",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Turn off reading nudges",
+      "expected_action": "manage_membership",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"manage_membership\",\n    \"args\": {\"operation\": \"disable_nudges\"},\n    \"response\": \"Got it! I've disabled reading-nudge DMs for you. You'll no longer receive reminders to log your reading. You can re-enable them anytime by asking me to turn nudges back on.\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "manage_membership",
+        "args": {
+          "operation": "disable_nudges"
+        },
+        "response": "Got it! I've disabled reading-nudge DMs for you. You'll no longer receive reminders to log your reading. You can re-enable them anytime by asking me to turn nudges back on.",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Opt me out of the book club",
+      "expected_action": "manage_membership",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"manage_membership\",\n    \"args\": {\"operation\": \"opt_out\"},\n    \"response\": \"Got it! You've been opted out of the book club. You won't receive any more book club notifications or reading nudges. If you change your mind and want to rejoin later, just let me know!\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "manage_membership",
+        "args": {
+          "operation": "opt_out"
+        },
+        "response": "Got it! You've been opted out of the book club. You won't receive any more book club notifications or reading nudges. If you change your mind and want to rejoin later, just let me know!",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "What are my book club settings?",
+      "expected_action": "manage_membership",
+      "context": {},
+      "raw": "```json\n{\n  \"action\": \"manage_membership\",\n  \"args\": {\n    \"operation\": \"show\"\n  },\n  \"response\": \"Let me pull up your book club tier and reading-nudge settings.\",\n  \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "manage_membership",
+        "args": {
+          "operation": "show"
+        },
+        "response": "Let me pull up your book club tier and reading-nudge settings.",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "Help",
+      "expected_action": "help",
+      "context": {},
+      "raw": "```json\n{\n  \"action\": \"help\",\n  \"args\": {},\n  \"response\": \"Hey! I'm your book club assistant. Here's what I can help you with:\\n\\n📚 **Your Books** — Add books, start reading, log progress, finish, rate, or DNF (didn't finish)\\n🎯 **Goals & Tracking** — Set reading goals, check your progress, view your shelf, and track reading streaks\\n💬 **Club Activity** — See what everyone's reading, join nominations, vote on picks, and join discussions\\n🏆 **Stats & Leaderboards** — Check rankings, year-in-review, streak leaderboards, and group summaries\\n🔔 **Reminders** — Set reading reminders or check-ins\\n⚙️ **Membership** — Join Core Book Club, manage nudge DMs, or adjust your settings\\n🗳️ **Admin Tools** — Open/close nominations and polls, manage tone, view the club dashboard\\n\\nJust tell me what you'd like to do! For example: \\\"Add *The Midnight Library* by Matt Haig\\\", \\\"What should I read next?\\\", \\\"Show me the leaderboard\\\", or \\\"Help with polls\\\".\",\n  \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "help",
+        "args": {},
+        "response": "Hey! I'm your book club assistant. Here's what I can help you with:\n\n📚 **Your Books** — Add books, start reading, log progress, finish, rate, or DNF (didn't finish)\n🎯 **Goals & Tracking** — Set reading goals, check your progress, view your shelf, and track reading streaks\n💬 **Club Activity** — See what everyone's reading, join nominations, vote on picks, and join discussions\n🏆 **Stats & Leaderboards** — Check rankings, year-in-review, streak leaderboards, and group summaries\n🔔 **Reminders** — Set reading reminders or check-ins\n⚙️ **Membership** — Join Core Book Club, manage nudge DMs, or adjust your settings\n🗳️ **Admin Tools** — Open/close nominations and polls, manage tone, view the club dashboard\n\nJust tell me what you'd like to do! For example: \"Add *The Midnight Library* by Matt Haig\", \"What should I read next?\", \"Show me the leaderboard\", or \"Help with polls\".",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "What can you do?",
+      "expected_action": "help",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"help\",\n    \"args\": {},\n    \"response\": \"I'm your book club assistant! Here's what I can help you with:\\n\\n📚 **Reading Tracking:** Log books you're currently reading, update progress, mark books as finished or DNF, and rate them.\\n\\n📖 **Your Shelf:** Check your currently reading, finished, and wishlist. I can also show you what others are reading or what the whole club is reading.\\n\\n🎯 **Goals & Streaks:** Set reading goals, check your progress, track your reading streak, and see leaderboards.\\n\\n💡 **Recommendations:** Get book suggestions based on genres, moods, or books similar to ones you love.\\n\\n🗳️ **Club Decisions:** Nominate books, vote on picks, run polls for scheduling/pacing, and open discussion threads.\\n\\n📊 **Stats & Reviews:** See year-in-review recaps, leaderboards, group activity summaries, and admin dashboards.\\n\\n🔔 **Reminders & Settings:** Set reading reminders, manage your club membership, and toggle reading nudge DMs.\\n\\nWhat would you like to do? Just ask me anything book-related! 😊\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "help",
+        "args": {},
+        "response": "I'm your book club assistant! Here's what I can help you with:\n\n📚 **Reading Tracking:** Log books you're currently reading, update progress, mark books as finished or DNF, and rate them.\n\n📖 **Your Shelf:** Check your currently reading, finished, and wishlist. I can also show you what others are reading or what the whole club is reading.\n\n🎯 **Goals & Streaks:** Set reading goals, check your progress, track your reading streak, and see leaderboards.\n\n💡 **Recommendations:** Get book suggestions based on genres, moods, or books similar to ones you love.\n\n🗳️ **Club Decisions:** Nominate books, vote on picks, run polls for scheduling/pacing, and open discussion threads.\n\n📊 **Stats & Reviews:** See year-in-review recaps, leaderboards, group activity summaries, and admin dashboards.\n\n🔔 **Reminders & Settings:** Set reading reminders, manage your club membership, and toggle reading nudge DMs.\n\nWhat would you like to do? Just ask me anything book-related! 😊",
+        "flag_injection": false
+      }
+    },
+    {
+      "message": "How do polls work?",
+      "expected_action": "help",
+      "context": {},
+      "raw": "```json\n{\n    \"action\": \"help\",\n    \"args\": {\"topic\": \"polls\"},\n    \"response\": \"Great question! Here's how polls work in our book club:\\n\\n**Nomination & Voting Process:**\\n1. An admin opens a **nomination window** — members nominate books they'd like the club to read\\n2. The admin then **opens a poll** on the nominated books — everyone votes for their top pick\\n3. The **poll closes** (automatically or manually), and the book with the most votes becomes our next club read!\\n\\n**Coordination Polls:**\\nAdmins can also run **coordination polls** to vote on scheduling questions like:\\n- Reading pace (chapters per week, pages per day)\\n- Meeting dates or times\\n- Other club logistics\\n\\n**Viewing Results:**\\nYou can check current vote standings anytime with a poll results command.\\n\\nWant to nominate a book, see current nominations, or check poll results? Just let me know!\",\n    \"flag_injection\": false\n}\n```",
+      "intent": {
+        "action": "help",
+        "args": {
+          "topic": "polls"
+        },
+        "response": "Great question! Here's how polls work in our book club:\n\n**Nomination & Voting Process:**\n1. An admin opens a **nomination window** — members nominate books they'd like the club to read\n2. The admin then **opens a poll** on the nominated books — everyone votes for their top pick\n3. The **poll closes** (automatically or manually), and the book with the most votes becomes our next club read!\n\n**Coordination Polls:**\nAdmins can also run **coordination polls** to vote on scheduling questions like:\n- Reading pace (chapters per week, pages per day)\n- Meeting dates or times\n- Other club logistics\n\n**Viewing Results:**\nYou can check current vote standings anytime with a poll results command.\n\nWant to nominate a book, see current nominations, or check poll results? Just let me know!",
+        "flag_injection": false
+      }
+    }
+  ]
+}
+

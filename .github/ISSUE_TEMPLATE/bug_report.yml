@@ -1,0 +1,35 @@
+name: Bug report
+description: Something the bot does wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what the bot did, and what you expected. Remove tokens, keys and member names.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. @Book Club Bot started Dune
+        2. /current
+        3. ...
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From `/status`, or the commit you're running.
+  - type: dropdown
+    id: provider
+    attributes:
+      label: LLM provider
+      options: [anthropic, openai, deepseek]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant log lines. Check they contain no secrets.
+      render: text

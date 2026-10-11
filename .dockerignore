@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+data/
+tests/
+**/*.md
+!CHANGELOG.md
+.venv/
+.claude/
+.github/
+.orch/

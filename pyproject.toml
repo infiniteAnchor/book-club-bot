@@ -1,0 +1,51 @@
+[project]
+name = "book-club-bot"
+version = "0.1.0"
+description = "Discord bot for a small reading group"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+
+# Runtime pins stay in requirements.txt (Docker install path).
+# Test deps: pip install -r requirements-dev.txt
+# Optional local tooling: pip install ruff mypy
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["."]
+extend-exclude = [".venv", "venv", "data", "__pycache__"]
+
+[tool.ruff.lint]
+# Core correctness only. Import sorting (I) and extra style rules stay off
+# until we want a dedicated cleanup pass — they would rewrite most files.
+select = ["E4", "E7", "E9", "F"]
+ignore = [
+    "E501",  # Discord copy and LLM prompts routinely exceed the line budget
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "E402",  # tests prepend sys.path before importing app modules
+]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_configs = true
+pretty = true
+exclude = ["data/", "\\.venv/", "venv/"]
+# discord.py View/Cog wiring assigns to .callback and similar methods.
+disable_error_code = ["method-assign"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "--ignore=tests/live_intents.py"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+include = ["*.py", "tests"]
+pythonVersion = "3.11"
