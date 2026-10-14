@@ -35,7 +35,7 @@ async def _send_chat(channel, handler):
 
     async def run(function, message, user_context):
         seen.append(channel.active)
-        return {"action": "query", "args": {}, "response": "ok"}
+        return [{"action": "query", "args": {}, "response": "ok"}]
 
     message = SimpleNamespace(
         author=SimpleNamespace(id=1, display_name="Reader", bot=False), guild=None,

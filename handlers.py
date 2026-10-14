@@ -1329,3 +1329,27 @@ GUEST_BLOCKED_ACTIONS = frozenset(
     name for name, spec in INTENT_ACTIONS.items() if spec.guest_blocked
 )
 OPT_IN_EXEMPT_ACTIONS = ADMIN_ONLY_ACTIONS | {"manage_membership", "help", "current_read"}
+
+
+def plan_dispatch(intents: list[dict]) -> list[dict]:
+    """Order of intents to dispatch for one message; [] means stay silent.
+
+    silent items are dropped. unknown items only survive when nothing actionable
+    was parsed, and then only the first, so the member gets one "didn't catch
+    that" reply rather than one per fragment.
+    """
+    spoken = [intent for intent in intents if intent.get("action") != "silent"]
+    actionable = [intent for intent in spoken if intent.get("action") != "unknown"]
+    return actionable or spoken[:1]
+
+
+def describe_dispatch(intent: dict) -> dict:
+    """Routing facts for one planned intent (dry-run harness and debug output)."""
+    spec = INTENT_ACTIONS.get(intent.get("action"))
+    handler = spec.handler if spec else None
+    return {
+        "handler": getattr(handler, "__name__", None),
+        "admin_only": bool(spec and spec.admin_only),
+        "guest_blocked": bool(spec and spec.guest_blocked),
+        "opt_in_exempt": intent.get("action") in OPT_IN_EXEMPT_ACTIONS,
+    }

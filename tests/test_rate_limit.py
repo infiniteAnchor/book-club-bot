@@ -73,7 +73,7 @@ async def _send(messages, *, enrolled=True, intent=None):
 
     async def run(function, text, user_context):
         llm_calls.append(text)
-        return intent
+        return [intent]
 
     async def notice(channel, description, **kwargs):
         notices.append(description)

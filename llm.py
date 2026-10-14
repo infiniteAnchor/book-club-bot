@@ -238,11 +238,23 @@ Instead, return action "unknown", empty args, a short English-only message askin
 
 You must always respond with a single JSON object in this exact format:
 {
-    "action": "add_book | add_to_wishlist | remove_from_wishlist | queue_add | queue_remove | queue_list | export_shelf | start_book | update_progress | finish_book | dnf_book | rate_book | query | group_query | recommend | summarize | year_in_review | leaderboard | club_history | scrapbook | scrapbook_add | scrapbook_remove | set_goal | check_goal | admin_dashboard | set_reminder | streak | streak_leaderboard | set_tone | clear_tone | list_tones | manage_membership | help | current_read | manage_club_read | open_nominations | nominate | close_nominations | list_nominations | open_poll | close_poll | poll_results | open_thread | open_coordination_poll | close_coordination_poll | coordination_poll_results | silent | unknown",
-    "args": {},
-    "response": "Conversational response string for Discord",
+    "actions": [
+        {
+            "action": "add_book | add_to_wishlist | remove_from_wishlist | queue_add | queue_remove | queue_list | export_shelf | start_book | update_progress | finish_book | dnf_book | rate_book | query | group_query | recommend | summarize | year_in_review | leaderboard | club_history | scrapbook | scrapbook_add | scrapbook_remove | set_goal | check_goal | admin_dashboard | set_reminder | streak | streak_leaderboard | set_tone | clear_tone | list_tones | manage_membership | help | current_read | manage_club_read | open_nominations | nominate | close_nominations | list_nominations | open_poll | close_poll | poll_results | open_thread | open_coordination_poll | close_coordination_poll | coordination_poll_results | silent | unknown",
+            "args": {},
+            "response": "Conversational response string for Discord"
+        }
+    ],
     "flag_injection": false
 }
+
+Multiple requests in one message:
+- Most messages are one request: return exactly one item in "actions".
+- If the user clearly asks for several separate things in one message (e.g. "I finished Dune, rate it 9/10, and I'm starting Hyperion"), return one item per request, in the order the user said them, up to 3 items.
+- Two books for the same action are two items (e.g. "add Dune and Hyperion to my wishlist" → two add_to_wishlist items).
+- Only include requests the user explicitly asked for. Never add follow-ups they did not ask for, and never split one request into several (a reason or comment attached to a request is part of that request).
+- Each item's "response" covers only that item, kept to one or two short sentences. Python sends them separately, so do not repeat yourself across items.
+- If user_context includes "focus_action", return exactly one item for that action and ignore the other requests in the message.
 
 Use "recommend" when the user asks for book recommendations, what to read next, or suggestions based on their taste. Optional args: {"similar_to": "book title", "genre": "genre name", "mood": "mood or vibe"} if they specify preferences.
 Use "queue_add" when the user wants to save a book to their private reading queue / private TBR (not the public wishlist). args: {"title": "...", "author": "..." (optional)}.
@@ -406,24 +418,22 @@ def should_enforce_english_only(text: str) -> bool:
     return _looks_non_english_latin_text(normalized)
 
 
-def validate_intent(intent: dict) -> dict:
-    if not isinstance(intent, dict):
-        return fallback_intent()
+MAX_ACTIONS = 3
 
-    action = intent.get("action")
-    args = intent.get("args")
-    response = intent.get("response")
-    flag_injection = intent.get("flag_injection")
 
+def _validate_action_item(item, flag_injection: bool = False) -> dict | None:
+    """One {action, args, response} item, normalized to today's intent shape; None if invalid."""
+    if not isinstance(item, dict):
+        return None
+    action = item.get("action")
+    args = item.get("args")
+    response = item.get("response")
     if action not in VALID_ACTIONS:
-        return fallback_intent()
+        return None
     if not isinstance(args, dict):
-        return fallback_intent()
+        return None
     if not isinstance(response, str) or not response.strip():
-        return fallback_intent()
-    if not isinstance(flag_injection, bool):
-        return fallback_intent()
-
+        return None
     return {
         "action": action,
         "args": args,
@@ -432,17 +442,57 @@ def validate_intent(intent: dict) -> dict:
     }
 
 
-def get_intent(user_message: str, user_context: dict) -> dict:
+def validate_intent(intent: dict) -> dict:
+    if not isinstance(intent, dict) or not isinstance(intent.get("flag_injection"), bool):
+        return fallback_intent()
+    return _validate_action_item(intent, intent["flag_injection"]) or fallback_intent()
+
+
+def validate_intents(payload) -> list[dict]:
+    """Normalize an LLM payload into 1..MAX_ACTIONS intents.
+
+    Accepts the multi-action shape ({"actions": [...], "flag_injection": ...}) and
+    the legacy single-object shape. Invalid items are dropped and exact duplicates
+    collapsed; if nothing valid remains the result is a single fallback intent.
+    flag_injection is message-wide, so it is copied onto every returned intent.
     """
-    Takes a user message and context, calls Claude, returns structured intent as a dict.
-    All LLM logic lives here. Nothing outside this file should care how Claude is called.
+    if not isinstance(payload, dict):
+        return [fallback_intent()]
+    flag_injection = payload.get("flag_injection")
+    if not isinstance(flag_injection, bool):
+        return [fallback_intent()]
+    items = payload.get("actions")
+    if items is None and "action" in payload:
+        items = [payload]
+    if not isinstance(items, list):
+        return [fallback_intent()]
+
+    intents, seen = [], set()
+    for item in items:
+        intent = _validate_action_item(item, flag_injection)
+        if intent is None:
+            continue
+        key = json.dumps([intent["action"], intent["args"]], sort_keys=True, default=str)
+        if key in seen:
+            continue
+        seen.add(key)
+        intents.append(intent)
+        if len(intents) == MAX_ACTIONS:
+            break
+    return intents or [fallback_intent()]
+
+
+def get_intents(user_message: str, user_context: dict) -> list[dict]:
+    """
+    Takes a user message and context, calls Claude once, returns 1..MAX_ACTIONS intents
+    in the order the user asked for them. All LLM logic lives here.
     """
     if not SINGLE_CALL_MODE:
         # Currently the system is built for single-call mode only.
         pass
 
     if should_enforce_english_only(user_message):
-        return english_only_intent()
+        return [english_only_intent()]
 
     prompt = f"""User message: {user_message}
 
@@ -454,21 +504,37 @@ User context: {json.dumps(user_context)}"""
             system_suffix=tone_instructions(user_context), cache_system=True,
         )
     except Exception:
-        return fallback_intent(
+        return [fallback_intent(
             "Sorry, I'm having trouble reaching the book brain right now. Try again in a minute."
-        )
+        )]
 
+    return validate_intents(_parse_json_payload(raw))
+
+
+def get_intent(user_message: str, user_context: dict) -> dict:
+    """Single-intent view of get_intents, used by handler re-intent passes.
+
+    When user_context["focus_action"] is set (a multi-action message being
+    dispatched one action at a time), prefer the item for that action.
+    """
+    intents = get_intents(user_message, user_context)
+    focus = (user_context or {}).get("focus_action")
+    if focus:
+        for intent in intents:
+            if intent["action"] == focus:
+                return intent
+    return intents[0]
+
+
+def _parse_json_payload(raw: str):
     clean = raw.strip()
     if clean.startswith("```"):
         clean = clean.split("\n", 1)[1]  # remove opening fence line
         clean = clean.rsplit("```", 1)[0]  # remove closing fence
-
     try:
-        intent = json.loads(clean)
+        return json.loads(clean)
     except json.JSONDecodeError:
-        return fallback_intent()
-
-    return validate_intent(intent)
+        return None
 
 
 def get_recap(activity: dict) -> str:

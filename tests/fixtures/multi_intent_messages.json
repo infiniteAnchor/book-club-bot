@@ -1,0 +1,32 @@
+{
+  "_comment": "Dummy chat messages for tests/dry_run_intents.py. Each case: message (required), expect (optional ordered action list), context (optional; defaults to the sample shelf below).",
+  "default_context": {
+    "books": [
+      {"title": "Dune", "author": "Frank Herbert", "status": "reading", "progress_raw": 150, "progress_unit": "pages"}
+    ]
+  },
+  "cases": [
+    {"message": "I finished Dune last night, give it a 9/10, and I'm starting Hyperion next",
+     "expect": ["finish_book", "rate_book", "start_book"]},
+    {"message": "Add Piranesi and The Hobbit to my wishlist",
+     "expect": ["add_to_wishlist", "add_to_wishlist"]},
+    {"message": "I'm on page 220 of Dune. Also what is the club reading right now?",
+     "expect": ["update_progress", "current_read"]},
+    {"message": "Nominate Station Eleven because it's a great winter read, and show me the current nominations",
+     "expect": ["nominate", "list_nominations"]},
+    {"message": "Gave up on Moby Dick. Can you recommend something lighter?",
+     "expect": ["dnf_book", "recommend"]},
+    {"message": "Set my goal to 30 books this year and show my streak",
+     "expect": ["set_goal", "streak"]},
+
+    {"message": "Rate Dune 9 because I loved finishing it",
+     "expect": ["rate_book"]},
+    {"message": "I finished Dune last night",
+     "expect": ["finish_book"]},
+    {"message": "What's on my shelf?",
+     "expect": ["query"]},
+    {"message": "<@123456789> start reading Neuromancer and put Snow Crash on my private TBR",
+     "expect": ["start_book", "queue_add"]},
+    {"message": "Finished Dune, rated it 8, started Hyperion, added Piranesi to my wishlist, and what's my streak?"}
+  ]
+}
