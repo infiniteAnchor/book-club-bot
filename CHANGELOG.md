@@ -1,6 +1,11 @@
 # Changelog
 
-## [2026-10-14] (Multiple requests per chat message, experimental)
+## [2026-10-14] (Multiple requests per chat message)
+announce: true
+
+### Announcement
+- Ask for a few things at once: "finished Dune, rate it 9/10, and I'm starting Hyperion" now does all three, in order (up to 3 per message).
+- If I miss part of a message, I'll do the rest and let you know to send that part again.
 
 ### Changed
 - One chat message can carry up to 3 requests (e.g. "finished Dune, rate it 9/10, starting Hyperion"). They run in the order asked, each with its own join-the-club and guest checks; a denial notice is sent once per kind.
