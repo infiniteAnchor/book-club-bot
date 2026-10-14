@@ -108,6 +108,7 @@ python tests/simulate.py               # scenario assertions (pure DB, no API)
 python -m compileall -q -x '/(\.venv|venv|data|\.git)/' .  # CI compile check
 python tests/live_intents.py           # OPT-IN: intent parsing vs real API (~40 calls) — never in CI
 python tests/capture_intent_fixtures.py  # OPT-IN: refresh tests/fixtures/intent_cases.json, then commit it
+python tests/dry_run_intents.py         # OPT-IN: dummy messages → live parser → planned actions in data/dry_run_intents.json (no Discord)
 python tests/seed.py                   # Seed test data
 ```
 

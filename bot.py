@@ -51,6 +51,7 @@ from help_content import build_unknown_help_embed
 from sending import (
     GUEST_DENIED_MESSAGE,
     INCOMPLETE_ACTION_MESSAGE,
+    PARTIAL_ACTION_MESSAGE,
     make_enrollment_embed,
     send_notice,
 )
@@ -73,6 +74,7 @@ from handlers import (
     RequestContext,
     _ACTION_HANDLERS,
     _send_response,
+    plan_dispatch,
 )
 from jobs import (
     notify_admin,
@@ -272,6 +274,38 @@ async def on_member_update(before, after):
         errors.log_exception(exc, surface="role_sync", guild_id=str(after.guild.id))
 
 
+def _gate_action(action, author_id: str, guild_id: str, settings: dict, guild) -> str | None:
+    """Return a denial key when this member may not run this action, else None."""
+    # Preference management and admin-only handlers are intentionally exempt.
+    # The handlers remain responsible for their own admin authorization.
+    if settings["member_opt_in_enabled"] and action not in OPT_IN_EXEMPT_ACTIONS:
+        preferences = get_member_feature_preferences(author_id, guild_id)
+        if not preferences[TRACKING_FEATURE]:
+            return "opt_in"
+    # Guest tier restriction — write actions blocked
+    if action in GUEST_BLOCKED_ACTIONS and get_access_tier(author_id) == "guest":
+        return "guest"
+    return None
+
+
+def _opt_in_notice(settings: dict, guild):
+    welcome = channel_setting_label(settings["opt_in_welcome_channel"], guild, empty="#welcome")
+    if guild:
+        reply = f"Join the book club with the enrollment panel in {welcome} before using bot features."
+    else:
+        reply = (
+            "To use bot features in DMs, first join the book club using the enrollment "
+            f"buttons in {welcome} in your server."
+        )
+    return reply, {"title": "👋 Join Book Club", "kind": "activity"}
+
+
+_DENIAL_NOTICES = {
+    "opt_in": _opt_in_notice,
+    "guest": lambda _settings, _guild: (GUEST_DENIED_MESSAGE, {}),
+}
+
+
 @client.event
 async def on_message(message):
     action = None
@@ -344,27 +378,28 @@ async def on_message(message):
         asyncio.create_task(message.add_reaction("👀"))
 
         async with typing_indicator(ctx.reply_channel):
-            intent = await run_llm(llm.get_intent, message.content, user_context)
+            intents = await run_llm(llm.get_intents, message.content, user_context)
 
         if DEBUG_INTENT:
-            print(f"\n--- Intent from: {message.author} ---")
-            print(json.dumps(intent, indent=2))
+            print(f"\n--- Intents from: {message.author} ---")
+            print(json.dumps(intents, indent=2))
             print("---")
 
-        if intent.get("flag_injection"):
+        if any(intent.get("flag_injection") for intent in intents):
             await notify_admin(
                 client,
                 f"Prompt injection flag from {message.author} ({message.author.id}) in guild {guild_id}: "
                 f"{_truncate(message.content, INJECTION_ALERT_MAX_CHARS)}"
             )
 
-        action = intent.get("action")
-        args = intent.get("args", {})
-
-        if action == "silent":
+        action = intents[0].get("action")
+        planned = plan_dispatch(intents)
+        if not planned:
             return
 
-        if action == "unknown":
+        if planned[0].get("action") == "unknown":
+            intent = planned[0]
+            action = "unknown"
             if intent.get("response") == llm.ENGLISH_ONLY_MESSAGE:
                 await send_notice(ctx.reply_channel, intent["response"])
             elif CONVERSATIONAL_RESPONSES:
@@ -373,47 +408,46 @@ async def on_message(message):
                 await _send_response(ctx, intent)
             return
 
-        # Preference management and admin-only handlers are intentionally exempt.
-        # The handlers remain responsible for their own admin authorization.
         settings = get_guild_settings(guild_id)
-        if settings["member_opt_in_enabled"] and action not in OPT_IN_EXEMPT_ACTIONS:
-            preferences = get_member_feature_preferences(str(message.author.id), guild_id)
-            if not preferences[TRACKING_FEATURE]:
-                welcome = channel_setting_label(
-                    settings["opt_in_welcome_channel"],
-                    message.guild,
-                    empty="#welcome",
-                )
-                if message.guild:
-                    reply = (
-                        f"Join the book club with the enrollment panel in {welcome} "
-                        "before using bot features."
-                    )
-                else:
-                    reply = (
-                        "To use bot features in DMs, first join the book club using the enrollment "
-                        f"buttons in {welcome} in your server."
-                    )
-                await send_notice(ctx.reply_channel, reply, title="👋 Join Book Club", kind="activity")
-                return
+        denials_sent = set()
+        # plan_dispatch drops fragments Claude couldn't parse when others were actionable.
+        dropped_unknown = any(intent.get("action") == "unknown" for intent in intents)
+        all_ran = not dropped_unknown
+        # Actions run in order and an exception stops the rest on purpose: later
+        # requests often depend on earlier ones ("finish Dune, rate it 9").
+        for index, intent in enumerate(planned):
+            action = intent.get("action")
+            denial = _gate_action(action, str(message.author.id), guild_id, settings, message.guild)
+            if denial:
+                all_ran = False
+                if denial not in denials_sent:
+                    denials_sent.add(denial)
+                    reply, kwargs = _DENIAL_NOTICES[denial](settings, message.guild)
+                    await send_notice(ctx.reply_channel, reply, **kwargs)
+                continue
 
-        # Guest tier restriction — write actions blocked
-        if action in GUEST_BLOCKED_ACTIONS:
-            tier = get_access_tier(str(message.author.id))
-            if tier == "guest":
-                await send_notice(
-                    ctx.reply_channel,
-                    GUEST_DENIED_MESSAGE,
-                )
-                return
+            handler = _ACTION_HANDLERS.get(action) if isinstance(action, str) else None
+            if not handler:
+                all_ran = False
+                await send_notice(ctx.reply_channel, INCOMPLETE_ACTION_MESSAGE)
+                continue
+            # Earlier actions may have changed the shelf, so rebuild context for later ones.
+            if index > 0:
+                user_context = await asyncio.to_thread(build_user_context, author_id, guild_id)
+            # Handlers mutate user_context during re-intent passes; give each its own
+            # copy, and tell a re-intent which of several requests it is answering.
+            # Keyed on the raw parse, not planned: [unknown, rate_book] plans one
+            # action but a re-intent would still see both fragments.
+            action_context = dict(user_context)
+            if len(intents) > 1:
+                action_context["focus_request"] = llm.focus_request(planned, index)
+            await handler(ctx, intent.get("args", {}), intent, action_context)
 
-        handler = _ACTION_HANDLERS.get(action) if isinstance(action, str) else None
-        if handler:
-            await handler(ctx, args, intent, user_context)
+        if dropped_unknown:
+            await send_notice(ctx.reply_channel, PARTIAL_ACTION_MESSAGE)
+        if all_ran:
             asyncio.create_task(message.remove_reaction("👀", client.user))
             asyncio.create_task(message.add_reaction("✅"))
-        else:
-            await send_notice(ctx.reply_channel, INCOMPLETE_ACTION_MESSAGE)
     except asyncio.CancelledError:
         telemetry.mark_failure()
         raise

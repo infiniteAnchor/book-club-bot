@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-10-14] (Multiple requests per chat message)
+announce: true
+
+### Announcement
+- Ask for a few things at once: "finished Dune, rate it 9/10, and I'm starting Hyperion" now does all three, in order (up to 3 per message).
+- If I miss part of a message, I'll do the rest and let you know to send that part again.
+
+### Changed
+- One chat message can carry up to 3 requests (e.g. "finished Dune, rate it 9/10, starting Hyperion"). They run in the order asked, each with its own join-the-club and guest checks; a denial notice is sent once per kind.
+- Each request after the first sees the shelf as earlier requests left it.
+- If part of a message can't be understood, the bot handles the rest, says it missed a part, and skips the ✅.
+- If one request fails, the ones after it don't run.
+- Intent replies may use up to 2048 output tokens so three-request replies aren't cut off.
+
+### Added
+- `tests/dry_run_intents.py`: opt-in harness that runs sample messages through the live parser and writes planned actions to `data/dry_run_intents.json`. No Discord or DB.
+
 ## [2026-09-29] (Self-hosting docs and public-safe CI)
 
 ### Added

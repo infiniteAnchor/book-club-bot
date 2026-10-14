@@ -23,7 +23,7 @@ def test_same_reader_waits_for_updated_context_and_other_reader_proceeds():
             if message == "first":
                 entered.set()
                 await release.wait()
-            return {"action": "query", "args": {}, "response": "ok"}
+            return [{"action": "query", "args": {}, "response": "ok"}]
 
         async def handler(ctx, args, intent, user_context):
             state[ctx.author_id] += 1

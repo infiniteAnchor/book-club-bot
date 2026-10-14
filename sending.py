@@ -26,6 +26,7 @@ INCOMPLETE_ACTION_MESSAGE = (
     "if relevant, your progress or rating."
 )
 INCOMPLETE_ACTION_SHORT = "I couldn't complete that cleanly. Try rephrasing."
+PARTIAL_ACTION_MESSAGE = "I handled the rest, but didn't catch part of that message. Try that part again on its own."
 
 QUEUE_LIST_PUBLIC_ACK = (
     "Your private queue stays private. Use the button to view it here — only you will see the titles."
