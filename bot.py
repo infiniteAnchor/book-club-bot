@@ -436,9 +436,11 @@ async def on_message(message):
                 user_context = await asyncio.to_thread(build_user_context, author_id, guild_id)
             # Handlers mutate user_context during re-intent passes; give each its own
             # copy, and tell a re-intent which of several requests it is answering.
+            # Keyed on the raw parse, not planned: [unknown, rate_book] plans one
+            # action but a re-intent would still see both fragments.
             action_context = dict(user_context)
-            if len(planned) > 1:
-                action_context["focus_action"] = action
+            if len(intents) > 1:
+                action_context["focus_request"] = llm.focus_request(planned, index)
             await handler(ctx, intent.get("args", {}), intent, action_context)
 
         if dropped_unknown:

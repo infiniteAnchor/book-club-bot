@@ -254,7 +254,7 @@ Multiple requests in one message:
 - Two books for the same action are two items (e.g. "add Dune and Hyperion to my wishlist" → two add_to_wishlist items).
 - Only include requests the user explicitly asked for. Never add follow-ups they did not ask for, and never split one request into several (a reason or comment attached to a request is part of that request).
 - Each item's "response" covers only that item, kept to one or two short sentences. Python sends them separately, so do not repeat yourself across items.
-- If user_context includes "focus_action", return exactly one item for that action and ignore the other requests in the message.
+- If user_context includes "focus_request", return exactly one item: the request matching its "action" and "args" (for repeated actions, "ordinal" is which of them, counting from 0). Ignore the other requests in the message.
 
 Use "recommend" when the user asks for book recommendations, what to read next, or suggestions based on their taste. Optional args: {"similar_to": "book title", "genre": "genre name", "mood": "mood or vibe"} if they specify preferences.
 Use "queue_add" when the user wants to save a book to their private reading queue / private TBR (not the public wishlist). args: {"title": "...", "author": "..." (optional)}.
@@ -513,18 +513,55 @@ User context: {json.dumps(user_context)}"""
     return validate_intents(_parse_json_payload(raw))
 
 
+def focus_request(planned: list[dict], index: int) -> dict:
+    """Identify planned[index] for a re-intent pass over a multi-request message.
+
+    The action name alone is ambiguous when one message repeats an action
+    ("rate Dune 9 and Hyperion 7"), so carry the args and the item's position
+    among planned items of the same action.
+    """
+    intent = planned[index]
+    action = intent.get("action")
+    ordinal = sum(1 for earlier in planned[:index] if earlier.get("action") == action)
+    return {"action": action, "args": intent.get("args", {}), "ordinal": ordinal}
+
+
+def _norm_title(args) -> str:
+    title = args.get("title") if isinstance(args, dict) else None
+    return " ".join(title.casefold().split()) if isinstance(title, str) else ""
+
+
+def _pick_focused(intents: list[dict], focus: dict) -> dict | None:
+    candidates = [intent for intent in intents if intent["action"] == focus.get("action")]
+    if len(candidates) <= 1:
+        return candidates[0] if candidates else None
+    args = focus.get("args") or {}
+    for intent in candidates:
+        if intent["args"] == args:
+            return intent
+    title = _norm_title(args)
+    if title:
+        for intent in candidates:
+            if _norm_title(intent["args"]) == title:
+                return intent
+    ordinal = focus.get("ordinal")
+    if isinstance(ordinal, int) and 0 <= ordinal < len(candidates):
+        return candidates[ordinal]
+    return candidates[0]
+
+
 def get_intent(user_message: str, user_context: dict) -> dict:
     """Single-intent view of get_intents, used by handler re-intent passes.
 
-    When user_context["focus_action"] is set (a multi-action message being
-    dispatched one action at a time), prefer the item for that action.
+    When user_context["focus_request"] is set (a multi-request message being
+    dispatched one action at a time), return the item for that exact request.
     """
     intents = get_intents(user_message, user_context)
-    focus = (user_context or {}).get("focus_action")
-    if focus:
-        for intent in intents:
-            if intent["action"] == focus:
-                return intent
+    focus = (user_context or {}).get("focus_request")
+    if isinstance(focus, dict):
+        picked = _pick_focused(intents, focus)
+        if picked is not None:
+            return picked
     return intents[0]
 
 

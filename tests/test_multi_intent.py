@@ -79,12 +79,37 @@ def test_nothing_valid_falls_back():
         assert llm.validate_intents(payload) == [llm.fallback_intent()]
 
 
-def test_get_intent_prefers_focus_action():
+def _focus(action, ordinal=0, **args):
+    return {"focus_request": {"action": action, "args": args, "ordinal": ordinal}}
+
+
+def test_get_intent_prefers_focus_request():
     raw = _payload(_item("update_progress", page=220), _item("query", "your shelf"))
     with mock.patch.object(llm, "_call_llm", return_value=raw):
-        assert llm.get_intent("page 220, and show my shelf", {"focus_action": "query"})["action"] == "query"
+        assert llm.get_intent("page 220, and show my shelf", _focus("query"))["action"] == "query"
         assert llm.get_intent("page 220, and show my shelf", {})["action"] == "update_progress"
-        assert llm.get_intent("page 220, and show my shelf", {"focus_action": "streak"})["action"] == "update_progress"
+        assert llm.get_intent("page 220, and show my shelf", _focus("streak"))["action"] == "update_progress"
+
+
+def test_get_intent_focus_tells_repeated_actions_apart():
+    raw = _payload(_item("rate_book", "Dune!", title="Dune", score=9),
+                   _item("rate_book", "Hyperion!", title="Hyperion", score=7))
+    message = "rate Dune 9 and Hyperion 7"
+    with mock.patch.object(llm, "_call_llm", return_value=raw):
+        # Exact args, then title (re-intent args can drift), then position.
+        assert llm.get_intent(message, _focus("rate_book", 1, title="Hyperion", score=7))["response"] == "Hyperion!"
+        assert llm.get_intent(message, _focus("rate_book", 0, title="  hyperion ", rating=7))["response"] == "Hyperion!"
+        assert llm.get_intent(message, _focus("rate_book", 1, title="Hyperion Cantos"))["response"] == "Hyperion!"
+        assert llm.get_intent(message, _focus("rate_book", 0, title="Hyperion Cantos"))["response"] == "Dune!"
+
+
+def test_focus_request_carries_args_and_ordinal():
+    planned = [_item("rate_book", title="Dune", score=9), _item("start_book", title="Hyperion"),
+               _item("rate_book", title="Hyperion", score=7)]
+    assert llm.focus_request(planned, 2) == {
+        "action": "rate_book", "args": {"title": "Hyperion", "score": 7}, "ordinal": 1,
+    }
+    assert llm.focus_request(planned, 1)["ordinal"] == 0
 
 
 # ── handlers.plan_dispatch ───────────────────────────────────────────────────
@@ -134,7 +159,10 @@ async def _dispatch(intents, handlers, *, tier="member", settings=None, tracking
         notices.append(description)
 
     message = _message()
-    with mock.patch.object(bot, "get_single_participation_guild", return_value="guild"), \
+    # Fresh limiter: bot._llm_limiter is module-global, so dispatches here would
+    # otherwise spend author 1's budget for later test files.
+    with mock.patch.object(bot, "_llm_limiter", bot.TokenBucketLimiter()), \
+         mock.patch.object(bot, "get_single_participation_guild", return_value="guild"), \
          mock.patch.object(bot, "_is_enrolled", return_value=True), \
          mock.patch.object(bot, "get_reply_channel", side_effect=lambda msg: msg.channel), \
          mock.patch.object(bot, "build_user_context", side_effect=context), \
@@ -158,7 +186,8 @@ def test_each_action_dispatched_in_order_with_its_own_context():
 
     def recorder(name):
         async def handler(ctx, args, intent, user_context):
-            calls.append((name, args, intent["response"], user_context.get("focus_action")))
+            focus = user_context.get("focus_request") or {}
+            calls.append((name, args, intent["response"], focus.get("action")))
             user_context["mutated_by"] = name
         return handler
 
@@ -210,7 +239,47 @@ def test_dropped_unknown_fragment_gets_notice_and_no_check():
     assert mock.call("✅") not in message.add_reaction.await_args_list
 
 
-def test_single_action_gets_no_focus_action():
+def test_partial_parse_still_focuses_the_runnable_action():
+    seen = []
+
+    async def handler(ctx, args, intent, user_context):
+        seen.append(user_context.get("focus_request"))
+
+    intents = [
+        {**_item("unknown", "huh?"), "flag_injection": False},
+        {**_item("rate_book", "9/10!", title="Dune", score=9), "flag_injection": False},
+    ]
+    notices, _ = asyncio.run(_dispatch(intents, {"rate_book": handler}))
+    assert seen == [{"action": "rate_book", "args": {"title": "Dune", "score": 9}, "ordinal": 0}]
+    assert notices == [bot.PARTIAL_ACTION_MESSAGE]
+
+
+def test_repeated_rate_book_reintent_answers_its_own_book():
+    import handlers
+
+    sent = []
+    reintent_raw = _payload(_item("rate_book", "Dune, nominated for the spice!", title="Dune", score=9),
+                            _item("rate_book", "Hyperion, nominated for the Shrike!", title="Hyperion", score=7))
+
+    async def send(ctx, intent):
+        sent.append(intent["response"])
+
+    intents = [
+        {**_item("rate_book", "Dune 9", title="Dune", score=9), "flag_injection": False},
+        {**_item("rate_book", "Hyperion 7", title="Hyperion", score=7), "flag_injection": False},
+    ]
+    with mock.patch.object(handlers, "run_book_action", mock.AsyncMock(return_value=True)), \
+         mock.patch.object(handlers, "check_achievements", return_value=[]), \
+         mock.patch.object(handlers, "get_nomination_context_for_book",
+                           return_value={"nomination_reason": "a classic"}), \
+         mock.patch.object(handlers, "_send_response", side_effect=send), \
+         mock.patch.object(handlers, "DEBUG_INTENT", False), \
+         mock.patch.object(llm, "_call_llm", return_value=reintent_raw):
+        asyncio.run(_dispatch(intents, {"rate_book": handlers._handle_rate_book}))
+    assert sent == ["Dune, nominated for the spice!", "Hyperion, nominated for the Shrike!"]
+
+
+def test_single_action_gets_no_focus_request():
     seen = []
 
     async def handler(ctx, args, intent, user_context):
