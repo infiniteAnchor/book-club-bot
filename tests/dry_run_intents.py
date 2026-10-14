@@ -79,6 +79,8 @@ def dry_run(cases: list[dict], get_intents=None) -> list[dict]:
                 for i in planned
             ],
             "flag_injection": any(i.get("flag_injection") for i in intents),
+            # on_message sends PARTIAL_ACTION_MESSAGE for these and skips the ✅.
+            "dropped_unknown": bool(actions != ["unknown"] and any(i["action"] == "unknown" for i in intents)),
             "parsed": intents,
         }
         if case.get("expect") is not None:

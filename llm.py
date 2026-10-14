@@ -419,6 +419,8 @@ def should_enforce_english_only(text: str) -> bool:
 
 
 MAX_ACTIONS = 3
+# Room for MAX_ACTIONS items with args and replies; billing is on tokens actually written.
+INTENT_MAX_TOKENS = 2048
 
 
 def _validate_action_item(item, flag_injection: bool = False) -> dict | None:
@@ -500,7 +502,7 @@ User context: {json.dumps(user_context)}"""
 
     try:
         raw = _call_llm(
-            SYSTEM_PROMPT, prompt, 1024,
+            SYSTEM_PROMPT, prompt, INTENT_MAX_TOKENS,
             system_suffix=tone_instructions(user_context), cache_system=True,
         )
     except Exception:

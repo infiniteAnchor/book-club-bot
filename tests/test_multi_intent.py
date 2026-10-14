@@ -120,8 +120,12 @@ def _message(text="msg"):
     )
 
 
-async def _dispatch(intents, handlers, *, tier="member", settings=None, tracking=True):
+async def _dispatch(intents, handlers, *, tier="member", settings=None, tracking=True, contexts=None):
     notices = []
+    contexts = iter(contexts or [])
+
+    def context(author_id, guild_id):
+        return next(contexts, {"books": []})
 
     async def run(function, text, user_context):
         return intents
@@ -133,7 +137,7 @@ async def _dispatch(intents, handlers, *, tier="member", settings=None, tracking
     with mock.patch.object(bot, "get_single_participation_guild", return_value="guild"), \
          mock.patch.object(bot, "_is_enrolled", return_value=True), \
          mock.patch.object(bot, "get_reply_channel", side_effect=lambda msg: msg.channel), \
-         mock.patch.object(bot, "build_user_context", return_value={"books": []}), \
+         mock.patch.object(bot, "build_user_context", side_effect=context), \
          mock.patch.object(bot, "get_guild_settings",
                            return_value=settings or {"member_opt_in_enabled": False}), \
          mock.patch.object(bot, "get_member_feature_preferences",
@@ -171,6 +175,39 @@ def test_each_action_dispatched_in_order_with_its_own_context():
     ]
     assert notices == []
     message.add_reaction.assert_any_await("✅")
+
+
+def test_later_actions_get_rebuilt_context():
+    seen = []
+
+    async def handler(ctx, args, intent, user_context):
+        seen.append(user_context["books"])
+
+    intents = [
+        {**_item("finish_book", "done!", title="Dune"), "flag_injection": False},
+        {**_item("rate_book", "9/10!", title="Dune", score=9), "flag_injection": False},
+    ]
+    asyncio.run(_dispatch(
+        intents, {"finish_book": handler, "rate_book": handler},
+        contexts=[{"books": ["reading"]}, {"books": ["finished"]}],
+    ))
+    assert seen == [["reading"], ["finished"]]
+
+
+def test_dropped_unknown_fragment_gets_notice_and_no_check():
+    ran = []
+
+    async def handler(ctx, args, intent, user_context):
+        ran.append(intent["action"])
+
+    intents = [
+        {**_item("finish_book", "done!", title="Dune"), "flag_injection": False},
+        {**_item("unknown", "huh?"), "flag_injection": False},
+    ]
+    notices, message = asyncio.run(_dispatch(intents, {"finish_book": handler}))
+    assert ran == ["finish_book"]
+    assert notices == [bot.PARTIAL_ACTION_MESSAGE]
+    assert mock.call("✅") not in message.add_reaction.await_args_list
 
 
 def test_single_action_gets_no_focus_action():

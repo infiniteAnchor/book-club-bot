@@ -51,6 +51,7 @@ from help_content import build_unknown_help_embed
 from sending import (
     GUEST_DENIED_MESSAGE,
     INCOMPLETE_ACTION_MESSAGE,
+    PARTIAL_ACTION_MESSAGE,
     make_enrollment_embed,
     send_notice,
 )
@@ -409,8 +410,12 @@ async def on_message(message):
 
         settings = get_guild_settings(guild_id)
         denials_sent = set()
-        all_ran = True
-        for intent in planned:
+        # plan_dispatch drops fragments Claude couldn't parse when others were actionable.
+        dropped_unknown = any(intent.get("action") == "unknown" for intent in intents)
+        all_ran = not dropped_unknown
+        # Actions run in order and an exception stops the rest on purpose: later
+        # requests often depend on earlier ones ("finish Dune, rate it 9").
+        for index, intent in enumerate(planned):
             action = intent.get("action")
             denial = _gate_action(action, str(message.author.id), guild_id, settings, message.guild)
             if denial:
@@ -426,6 +431,9 @@ async def on_message(message):
                 all_ran = False
                 await send_notice(ctx.reply_channel, INCOMPLETE_ACTION_MESSAGE)
                 continue
+            # Earlier actions may have changed the shelf, so rebuild context for later ones.
+            if index > 0:
+                user_context = await asyncio.to_thread(build_user_context, author_id, guild_id)
             # Handlers mutate user_context during re-intent passes; give each its own
             # copy, and tell a re-intent which of several requests it is answering.
             action_context = dict(user_context)
@@ -433,6 +441,8 @@ async def on_message(message):
                 action_context["focus_action"] = action
             await handler(ctx, intent.get("args", {}), intent, action_context)
 
+        if dropped_unknown:
+            await send_notice(ctx.reply_channel, PARTIAL_ACTION_MESSAGE)
         if all_ran:
             asyncio.create_task(message.remove_reaction("👀", client.user))
             asyncio.create_task(message.add_reaction("✅"))
