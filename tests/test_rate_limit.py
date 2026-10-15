@@ -4,6 +4,8 @@ import contextlib
 from types import SimpleNamespace
 from unittest import mock
 
+import pytest
+
 import bot
 from rate_limit import TokenBucketLimiter
 
@@ -64,7 +66,7 @@ def _message(text="hello", is_bot=False, user=1):
     )
 
 
-async def _send(messages, *, enrolled=True, intent=None):
+async def _send(messages, *, enrolled=True, intent=None, listen_settings=None):
     """Send messages through on_message with a fresh limiter; return (llm calls, notices, alerts)."""
     llm_calls = []
     notices = []
@@ -82,6 +84,8 @@ async def _send(messages, *, enrolled=True, intent=None):
         alerts.append(content)
 
     with mock.patch.object(bot, "_llm_limiter", TokenBucketLimiter(clock=FakeClock())), \
+         mock.patch.object(bot, "_listen_filter_state", return_value=(listen_settings, False)), \
+         mock.patch.object(bot, "_register_guild"), \
          mock.patch.object(bot, "get_single_participation_guild", return_value="guild"), \
          mock.patch.object(bot, "get_reply_channel", side_effect=lambda msg: msg.channel), \
          mock.patch.object(bot, "build_user_context", return_value={}), \
@@ -95,6 +99,37 @@ async def _send(messages, *, enrolled=True, intent=None):
         for message in messages:
             await bot.on_message(message)
     return llm_calls, notices, alerts
+
+
+@pytest.mark.parametrize("mention_kind,accepted", [
+    ("user", True),
+    ("bot_role", True),
+    ("other_bot_role", False),
+    ("same_name_role", False),
+    ("everyone", False),
+    ("none", False),
+])
+def test_guild_requires_bot_user_or_own_managed_role_mention(mention_kind, accepted):
+    bot_user = SimpleNamespace(id=42)
+    message = _message()
+    message.guild = SimpleNamespace(id=123, name="Book Club")
+    message.channel.id = 456
+    message.mentions = [bot_user] if mention_kind == "user" else []
+    role_tags = {
+        "bot_role": SimpleNamespace(bot_id=42),
+        "other_bot_role": SimpleNamespace(bot_id=99),
+        "same_name_role": None,
+        "everyone": None,
+    }
+    message.role_mentions = (
+        [SimpleNamespace(name="Book Club Bot", tags=role_tags[mention_kind])]
+        if mention_kind in role_tags else []
+    )
+    settings = {"listen_channel_only": False, "require_mention": True}
+    with mock.patch.object(bot, "client", SimpleNamespace(user=bot_user)):
+        calls, notices, _ = asyncio.run(_send([message], listen_settings=settings))
+    assert calls == ([message.content] if accepted else [])
+    assert notices == []
 
 
 def test_bot_and_webhook_messages_never_reach_llm():

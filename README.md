@@ -76,7 +76,8 @@ one small club per Discord server and can join several servers.
    roles it creates (`Book Club · Chat`, `· Tracking`, `· Updates`, `· Club`,
    `· DM Nudges` and `Book Club Admin`), or role changes fail.
 4. Create a `#book-bot` channel, or change the channel names below. Mention the
-   bot to talk to it: `@Book Club Bot started Dune`.
+   bot to talk to it: `@Book Club Bot started Dune`. Both the bot's user mention
+   and its Discord-managed bot role mention work; other role mentions do not.
 
 ### 2. Configure
 

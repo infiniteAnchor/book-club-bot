@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-15] (Bot role mentions)
+
+### Fixed
+- Chat requests now accept mentions of the bot's Discord-managed role as well as its user account. Other role mentions still do not trigger the bot.
+
 ## [2026-10-14] (Multiple requests per chat message)
 announce: true
 

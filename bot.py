@@ -336,7 +336,12 @@ async def on_message(message):
             # A user cannot naturally @mention the bot in a DM.  Keep the mention
             # requirement for server messages, but accept DM replies to nudges.
             if guild_settings_row["require_mention"] and client.user not in message.mentions:
-                return
+                # Discord lists the bot's managed role separately from its user mention.
+                if not any(
+                    role.tags and role.tags.bot_id == client.user.id
+                    for role in message.role_mentions
+                ):
+                    return
 
         guild_id = str(message.guild.id) if message.guild else get_single_participation_guild(str(message.author.id))
         if guild_id is None:
