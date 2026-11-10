@@ -49,6 +49,7 @@ from poll_workflows import (
     open_book_poll_workflow,
     open_coordination_poll_workflow,
     open_nominations_workflow,
+    open_poll_failure_text,
 )
 from views import (
     AdminDashboardView,
@@ -288,10 +289,7 @@ async def slash_poll(
             interaction.guild, guild_id, str(interaction.user.id), duration, interaction.channel,
         )
         if not result.ok:
-            await interaction.followup.send(
-                "A poll is already open, or there are no closed nominations to vote on.",
-                ephemeral=True,
-            )
+            await interaction.followup.send(open_poll_failure_text(result.reason), ephemeral=True)
             return
         await interaction.followup.send("The book poll is open and ready for votes.", ephemeral=True)
         return

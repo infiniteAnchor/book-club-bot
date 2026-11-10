@@ -7,6 +7,7 @@ scheduled jobs in jobs.py. This file only wires them together.
 import discord
 import json
 import asyncio
+import inspect
 import logging
 from weakref import WeakValueDictionary
 from datetime import datetime
@@ -160,39 +161,74 @@ async def ensure_enrollment_panel(guild):
     await jobs.sync_enrollment_panel(str(guild.id))
 
 
+async def _startup_step(step: str, fn, *args, guild_id=None, surface: str = "startup") -> None:
+    """Run one startup step; log and continue so one failure never skips the steps after it."""
+    try:
+        result = fn(*args)
+        if inspect.isawaitable(result):
+            await result
+    except Exception as exc:
+        errors.log_exception(exc, surface=surface, guild_id=guild_id, action=step)
+
+
+def _is_past(closes_at: str) -> bool:
+    closes_at_dt = datetime.fromisoformat(closes_at)
+    return closes_at_dt <= datetime.now(closes_at_dt.tzinfo)
+
+
+async def _restore_window(guild, guild_id: str, fallback) -> None:
+    window = get_active_window(guild_id)
+    if not window:
+        return
+    if _is_past(window["closes_at"]):
+        await close_nominations_workflow(guild, guild_id, fallback, manual=False)
+    else:
+        schedule_auto_close(guild_id, window["closes_at"], guild)
+
+
+async def _restore_book_poll(guild, guild_id: str, fallback) -> None:
+    poll = get_active_poll(guild_id)
+    if not (poll and poll.get("nominations")):
+        return
+    if _is_past(poll["closes_at"]):
+        await close_book_poll_workflow(
+            guild, guild_id, poll.get("opened_by") or "auto-close", fallback, manual=False,
+        )
+    else:
+        client.add_view(VotingView(guild_id, poll["poll_id"], poll["nominations"], timeout=None))
+        schedule_poll_auto_close(guild_id, poll["closes_at"], guild)
+
+
+async def _restore_coordination_poll(guild, guild_id: str, fallback) -> None:
+    coord_poll = get_active_coordination_poll(guild_id)
+    if not (coord_poll and coord_poll.get("options")):
+        return
+    if _is_past(coord_poll["closes_at"]):
+        await close_coordination_poll_workflow(guild, guild_id, fallback, manual=False)
+    else:
+        client.add_view(CoordinationView(guild_id, coord_poll["poll_id"], coord_poll["options"], timeout=None))
+        schedule_coordination_poll_auto_close(guild_id, coord_poll["closes_at"], guild)
+
+
 async def restore_open_items():
-    """Re-register persistent views and auto-close jobs for any open polls."""
+    """Re-register persistent views and auto-close jobs for any open polls.
+
+    Each guild and each item is isolated: closing an expired item posts to Discord,
+    and a permission error there must not strand the other guilds' items.
+    """
     for guild in client.guilds:
         guild_id = str(guild.id)
-        fallback = resolve_text_channel(guild, get_guild_settings(guild_id)["nominations_channel"])
-
-        window = get_active_window(guild_id)
-        if window:
-            closes_at_dt = datetime.fromisoformat(window["closes_at"])
-            if closes_at_dt <= datetime.now(closes_at_dt.tzinfo):
-                await close_nominations_workflow(guild, guild_id, fallback, manual=False)
-            else:
-                schedule_auto_close(guild_id, window["closes_at"], guild)
-
-        poll = get_active_poll(guild_id)
-        if poll and poll.get("nominations"):
-            closes_at_dt = datetime.fromisoformat(poll["closes_at"])
-            if closes_at_dt <= datetime.now(closes_at_dt.tzinfo):
-                await close_book_poll_workflow(
-                    guild, guild_id, poll.get("opened_by") or "auto-close", fallback, manual=False,
-                )
-            else:
-                client.add_view(VotingView(guild_id, poll["poll_id"], poll["nominations"], timeout=None))
-                schedule_poll_auto_close(guild_id, poll["closes_at"], guild)
-
-        coord_poll = get_active_coordination_poll(guild_id)
-        if coord_poll and coord_poll.get("options"):
-            closes_at_dt = datetime.fromisoformat(coord_poll["closes_at"])
-            if closes_at_dt <= datetime.now(closes_at_dt.tzinfo):
-                await close_coordination_poll_workflow(guild, guild_id, fallback, manual=False)
-            else:
-                client.add_view(CoordinationView(guild_id, coord_poll["poll_id"], coord_poll["options"], timeout=None))
-                schedule_coordination_poll_auto_close(guild_id, coord_poll["closes_at"], guild)
+        try:
+            fallback = resolve_text_channel(guild, get_guild_settings(guild_id)["nominations_channel"])
+        except Exception as exc:
+            errors.log_exception(exc, surface="startup", guild_id=guild_id, action="restore_open_items")
+            continue
+        for step, fn in (
+            ("restore_nomination_window", _restore_window),
+            ("restore_book_poll", _restore_book_poll),
+            ("restore_coordination_poll", _restore_coordination_poll),
+        ):
+            await _startup_step(step, fn, guild, guild_id, fallback, guild_id=guild_id)
 
 
 @client.event
@@ -201,31 +237,41 @@ async def on_ready():
         await _on_ready_startup()
 
 
-async def _on_ready_startup():
+async def _sync_commands_once() -> None:
+    """Sync slash commands once per process; a failure leaves the flag unset so the next ready retries."""
     global _commands_synced
+    if _commands_synced:
+        return
+    await command_tree.sync()
+    _commands_synced = True
+
+
+async def _on_ready_startup():
     init_db()
-    if not _commands_synced:
-        await command_tree.sync()
-        _commands_synced = True
+    await _startup_step("sync_commands", _sync_commands_once)
     client.add_view(EnrollmentView())
     client.add_view(NominateView())
+    # Every step is isolated (per guild where it applies), matching the scheduled jobs:
+    # one guild's missing permission must not skip scheduling for everyone else.
     for guild in client.guilds:
         guild_id = str(guild.id)
-        _register_guild(guild_id, guild.name)
-        upgrade_guild_channel_settings(guild)
-        await ensure_enrollment_panel(guild)
-        schedule_guild_jobs(guild_id)
         try:
-            await run_startup_sync(guild)
+            _register_guild(guild_id, guild.name)
         except Exception as exc:
-            errors.log_exception(exc, surface="role_sync", guild_id=guild_id)
-    await sync_release_boards(client.guilds)
-    await restore_open_items()
-    jobs.restore_poll_thread_deletions()
-    schedule_taste_profile_updates()
-    schedule_year_in_review()
-    schedule_reminder_sweep()
-    await recover_missed_year_in_review()
+            # Settings row is a prerequisite for every later per-guild step.
+            errors.log_exception(exc, surface="startup", guild_id=guild_id, action="register_guild")
+            continue
+        await _startup_step("upgrade_channel_settings", upgrade_guild_channel_settings, guild, guild_id=guild_id)
+        await _startup_step("enrollment_panel", ensure_enrollment_panel, guild, guild_id=guild_id)
+        await _startup_step("schedule_guild_jobs", schedule_guild_jobs, guild_id, guild_id=guild_id)
+        await _startup_step("role_sync", run_startup_sync, guild, guild_id=guild_id, surface="role_sync")
+    await _startup_step("release_boards", sync_release_boards, client.guilds)
+    await _startup_step("restore_open_items", restore_open_items)
+    await _startup_step("restore_poll_thread_deletions", jobs.restore_poll_thread_deletions)
+    await _startup_step("schedule_taste_profiles", schedule_taste_profile_updates)
+    await _startup_step("schedule_year_in_review", schedule_year_in_review)
+    await _startup_step("schedule_reminder_sweep", schedule_reminder_sweep)
+    await _startup_step("recover_year_in_review", recover_missed_year_in_review)
     print(f"Logged in as {client.user}")
 
 

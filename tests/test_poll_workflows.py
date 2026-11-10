@@ -164,6 +164,39 @@ class PollWorkflowTests(unittest.TestCase):
         self.assertFalse(again.ok)
         self.assertEqual(again.reason, "already_open")
 
+    def _polled_round(self, title):
+        from actions_nominations import close_poll
+        open_nomination_window(GUILD, OPENER, days=1)
+        submit_nomination(OPENER, "Alice", GUILD, title, "Someone", "reason")
+        close_nomination_window(GUILD, manual=True)
+        poll_id, _noms = open_poll(GUILD, OPENER, days=1)
+        self.assertTrue(poll_id)
+        close_poll(GUILD)
+
+    def test_open_poll_refuses_while_newer_round_is_open(self):
+        self._polled_round("Old Book A")
+        open_nomination_window(GUILD, OPENER, days=1)
+        submit_nomination(OPENER, "Alice", GUILD, "New Book C", "Someone", "reason")
+
+        self.assertEqual(open_poll(GUILD, OPENER, days=1), (0, []))
+        result = _run(open_book_poll_workflow(self.guild, GUILD, OPENER, 3, self.fallback))
+        self.assertFalse(result.ok)
+        self.assertEqual(result.reason, "nominations_open")
+        self.assertIn("Close them first", poll_workflows.open_poll_failure_text(result.reason))
+        self.assertIsNone(get_active_poll(GUILD))
+
+        close_nomination_window(GUILD, manual=True)
+        poll_id, noms = open_poll(GUILD, OPENER, days=1)
+        self.assertTrue(poll_id)
+        self.assertEqual([n["title"] for n in noms], ["New Book C"])
+
+    def test_open_poll_does_not_repoll_a_finished_round(self):
+        self._polled_round("Old Book A")
+        self.assertEqual(open_poll(GUILD, OPENER, days=1), (0, []))
+        result = _run(open_book_poll_workflow(self.guild, GUILD, OPENER, 3, self.fallback))
+        self.assertFalse(result.ok)
+        self.assertEqual(result.reason, "no_nominations")
+
     def test_close_tied_poll_opens_tiebreaker(self):
         open_nomination_window(GUILD, OPENER, days=1)
         submit_nomination("1", "Alice", GUILD, "Dune", "Frank Herbert", "a")

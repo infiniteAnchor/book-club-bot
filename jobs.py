@@ -292,7 +292,9 @@ async def run_inactivity_nudges_for_guild(guild_id: str):
     if not settings["inactivity_nudge_scheduled"]:
         return
     groups = get_inactivity_nudge_groups(
-        guild_id, settings["inactivity_nudge_days"], settings["inactivity_nudge_days"],
+        guild_id,
+        settings["inactivity_nudge_days"],
+        settings["inactivity_nudge_interval_hours"] / 24,
     )
     for group in groups:
         try:
@@ -435,18 +437,14 @@ def schedule_guild_jobs(guild_id: str) -> None:
             )
 
     if settings["inactivity_nudge_scheduled"]:
-        nudge_job_id = nudge_id
-
-        def job_fn(gid=guild_id, jid=nudge_job_id):
-            _launch(run_inactivity_nudges_for_guild(gid), jid)
-
-        scheduler.add_job(
-            job_fn,
-            "interval",
-            hours=settings["inactivity_nudge_interval_hours"],
-            id=nudge_job_id,
-            replace_existing=True,
-            misfire_grace_time=3600,
+        # Daily cron, not an interval: an interval restarts its countdown on every reschedule
+        # (startup, on_ready, dashboard saves), so a 14-day interval almost never fired.
+        # Eligibility and repeat spacing are gated per book in get_inactivity_nudge_groups.
+        _add_cron_job(
+            lambda gid=guild_id, jid=nudge_id: _launch(run_inactivity_nudges_for_guild(gid), jid),
+            nudge_id,
+            "*",
+            settings["weekly_recap_hour"],
         )
 
 

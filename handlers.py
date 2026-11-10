@@ -94,6 +94,7 @@ from poll_workflows import (
     open_book_poll_workflow,
     open_coordination_poll_workflow,
     open_nominations_workflow,
+    open_poll_failure_text,
 )
 from participation_roles import ParticipationRoleError, set_participation
 from sending import (
@@ -921,12 +922,7 @@ async def _handle_open_poll(ctx: RequestContext, args, _intent, _ctx):
         ctx.message.guild, ctx.guild_id, ctx.author_id, days, ctx.reply_channel,
     )
     if not result.ok:
-        await _notice(
-            ctx,
-            "A poll is already open, or there are no nominations to vote on.",
-            title="🗳️ Poll results",
-            kind="poll",
-        )
+        await _notice(ctx, open_poll_failure_text(result.reason), title="🗳️ Poll results", kind="poll")
         return
     if result.posted_elsewhere:
         await _notice(ctx, f"Poll opened in {result.channel_name}.", title="🗳️ Poll results", kind="poll")

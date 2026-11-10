@@ -60,6 +60,7 @@ from poll_workflows import (
     open_book_poll_workflow,
     open_coordination_poll_workflow,
     open_nominations_workflow,
+    open_poll_failure_text,
 )
 
 
@@ -873,10 +874,7 @@ class AdminDashboardView(errors.SafeUIMixin, discord.ui.View):
         elif action == "open_poll":
             result = await open_book_poll_workflow(guild, self.guild_id, opened_by, days, fallback)
             if not result.ok:
-                await interaction.followup.send(
-                    "A book poll is already open, or there are no closed nominations to vote on.",
-                    ephemeral=True,
-                )
+                await interaction.followup.send(open_poll_failure_text(result.reason), ephemeral=True)
                 return
         else:
             result = await open_coordination_poll_workflow(
