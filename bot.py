@@ -237,12 +237,18 @@ async def on_ready():
         await _on_ready_startup()
 
 
-async def _on_ready_startup():
+async def _sync_commands_once() -> None:
+    """Sync slash commands once per process; a failure leaves the flag unset so the next ready retries."""
     global _commands_synced
+    if _commands_synced:
+        return
+    await command_tree.sync()
+    _commands_synced = True
+
+
+async def _on_ready_startup():
     init_db()
-    if not _commands_synced:
-        await command_tree.sync()
-        _commands_synced = True
+    await _startup_step("sync_commands", _sync_commands_once)
     client.add_view(EnrollmentView())
     client.add_view(NominateView())
     # Every step is isolated (per guild where it applies), matching the scheduled jobs:

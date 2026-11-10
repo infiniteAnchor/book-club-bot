@@ -667,7 +667,9 @@ class BotWiringTests(unittest.TestCase):
             if isinstance(node, ast.AsyncFunctionDef) and node.name == "_on_ready_startup"
         )
         body = ast.get_source_segment(src, startup) or ""
+        self.assertNotIn("command_tree.sync(", body)
         for step in (
+            "_sync_commands_once",
             "ensure_enrollment_panel", "schedule_guild_jobs", "run_startup_sync",
             "sync_release_boards", "restore_open_items", "jobs.restore_poll_thread_deletions",
             "schedule_taste_profile_updates", "schedule_year_in_review",
@@ -709,6 +711,44 @@ class BotWiringTests(unittest.TestCase):
         self.assertIn("action=one", text)
         self.assertIn("action=two", text)
         self.assertIn("guild=g1", text)
+
+    def test_command_sync_failure_does_not_block_later_steps_and_retries(self):
+        import ast
+        import inspect
+        src = open("bot.py").read()
+        tree = ast.parse(src)
+        nodes: list[ast.stmt] = [
+            n for n in tree.body
+            if isinstance(n, ast.AsyncFunctionDef) and n.name in ("_startup_step", "_sync_commands_once")
+        ]
+        self.assertEqual(len(nodes), 2)
+        command_tree = mock.Mock()
+        command_tree.sync = mock.AsyncMock(
+            side_effect=[discord.HTTPException(mock.Mock(status=503, reason="Unavailable"), "down"), None]
+        )
+        namespace = {
+            "inspect": inspect, "errors": errors,
+            "command_tree": command_tree, "_commands_synced": False,
+        }
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), "bot.py", "exec"), namespace)
+        startup_step = cast(Any, namespace["_startup_step"])
+        sync_once = namespace["_sync_commands_once"]
+        later = []
+
+        async def ready():
+            await startup_step("sync_commands", sync_once)
+            await startup_step("schedule_reminder_sweep", lambda: later.append("ran"))
+
+        with LogCapture() as cap:
+            asyncio.run(ready())
+        self.assertEqual(later, ["ran"])
+        self.assertFalse(namespace["_commands_synced"])
+        self.assertIn("action=sync_commands", cap.text)
+
+        asyncio.run(ready())
+        self.assertTrue(namespace["_commands_synced"])
+        asyncio.run(ready())
+        self.assertEqual(command_tree.sync.await_count, 2)
 
 
 if __name__ == "__main__":
