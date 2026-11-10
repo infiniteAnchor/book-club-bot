@@ -6,7 +6,7 @@ from actions import get_or_create_user, _parse_db_datetime
 from actions_participation import DM_NUDGES_FEATURE, TRACKING_FEATURE
 
 
-def get_inactivity_nudge_groups(guild_id: str, min_days: int, cooldown_days: int) -> list:
+def get_inactivity_nudge_groups(guild_id: str, min_days: int, cooldown_days: float) -> list:
     """
     Returns grouped stale reading items that are eligible for an inactivity nudge.
     """

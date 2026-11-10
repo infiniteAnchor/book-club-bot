@@ -657,6 +657,59 @@ class BotWiringTests(unittest.TestCase):
 
         asyncio.run(check())
 
+    def test_on_ready_isolates_every_step(self):
+        """One failing step must not skip the ones after it (review 2026-11-09 #8)."""
+        import ast
+        src = open("bot.py").read()
+        tree = ast.parse(src)
+        startup = next(
+            node for node in tree.body
+            if isinstance(node, ast.AsyncFunctionDef) and node.name == "_on_ready_startup"
+        )
+        body = ast.get_source_segment(src, startup) or ""
+        for step in (
+            "ensure_enrollment_panel", "schedule_guild_jobs", "run_startup_sync",
+            "sync_release_boards", "restore_open_items", "jobs.restore_poll_thread_deletions",
+            "schedule_taste_profile_updates", "schedule_year_in_review",
+            "schedule_reminder_sweep", "recover_missed_year_in_review",
+        ):
+            self.assertNotIn(f"{step}(", body, f"{step} is called outside _startup_step")
+            self.assertIn(f", {step}", body)
+
+    def test_startup_step_logs_and_continues_for_sync_and_async_failures(self):
+        import ast
+        import inspect
+        src = open("bot.py").read()
+        tree = ast.parse(src)
+        node = next(
+            n for n in tree.body
+            if isinstance(n, ast.AsyncFunctionDef) and n.name == "_startup_step"
+        )
+        namespace = {"inspect": inspect, "errors": errors}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "bot.py", "exec"), namespace)
+        startup_step = cast(Any, namespace["_startup_step"])
+
+        def sync_fail():
+            raise RuntimeError("sync boom")
+
+        async def async_fail(_guild):
+            raise discord.Forbidden(mock.Mock(status=403, reason="Forbidden"), "Missing Access")
+
+        ran = []
+
+        async def run_all():
+            await startup_step("one", sync_fail)
+            await startup_step("two", async_fail, object(), guild_id="g1")
+            await startup_step("three", lambda: ran.append("three"))
+
+        with LogCapture() as cap:
+            asyncio.run(run_all())
+        self.assertEqual(ran, ["three"])
+        text = cap.text
+        self.assertIn("action=one", text)
+        self.assertIn("action=two", text)
+        self.assertIn("guild=g1", text)
+
 
 if __name__ == "__main__":
     unittest.main()

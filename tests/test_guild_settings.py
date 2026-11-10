@@ -173,6 +173,57 @@ class GuildJobScheduleTests(unittest.TestCase):
                     )
                     self.assertEqual(added[0]["hour"], 8)
 
+    def test_inactivity_nudge_is_a_daily_cron_that_survives_rescheduling(self):
+        """An interval trigger restarted its 14-day countdown on every reschedule (review 2026-11-09 #2)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "bookclub.db")
+            with mock.patch.object(database, "DB_PATH", db_path):
+                database.init_db()
+                guild_settings.update_guild_settings(
+                    "guild-1",
+                    combined_weekly_post=False,
+                    weekly_recap_scheduled=False,
+                    checkin_prompt_scheduled=False,
+                    inactivity_nudge_scheduled=True,
+                    inactivity_nudge_interval_hours=336,
+                    weekly_recap_hour=17,
+                )
+                added = []
+
+                class FakeScheduler:
+                    def get_job(self, job_id):
+                        return next((item for item in added if item["id"] == job_id), None)
+
+                    def remove_job(self, job_id):
+                        added[:] = [item for item in added if item["id"] != job_id]
+
+                    def add_job(self, func, trigger, **kwargs):
+                        added.append({"func": func, "trigger": trigger, **kwargs})
+
+                import jobs
+                with mock.patch.object(jobs, "scheduler", FakeScheduler()):
+                    jobs.schedule_guild_jobs("guild-1")
+                    jobs.schedule_guild_jobs("guild-1")
+                    self.assertEqual(len(added), 1)
+                    job = added[0]
+                    self.assertEqual(job["id"], "inactivity_nudge_sweep:guild-1")
+                    self.assertEqual(job["trigger"], "cron")
+                    self.assertEqual(job["day_of_week"], "*")
+                    self.assertEqual(job["hour"], 17)
+                    self.assertNotIn("hours", job)
+
+    def test_inactivity_nudge_interval_is_the_per_book_repeat_gap(self):
+        import jobs
+        settings = {
+            "inactivity_nudge_scheduled": True,
+            "inactivity_nudge_days": 10,
+            "inactivity_nudge_interval_hours": 72,
+        }
+        with mock.patch.object(jobs, "get_guild_settings", return_value=settings), \
+                mock.patch.object(jobs, "get_inactivity_nudge_groups", return_value=[]) as groups:
+            asyncio.run(jobs.run_inactivity_nudges_for_guild("guild-1"))
+        groups.assert_called_once_with("guild-1", 10, 3.0)
+
     def test_cancel_guild_jobs_removes_periodic_and_auto_close_jobs(self):
         import jobs
 

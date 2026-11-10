@@ -45,6 +45,13 @@ class PollWorkflowResult:
     posted_elsewhere: bool = False
 
 
+def open_poll_failure_text(reason: str) -> str:
+    """Invoker-facing copy for a failed open_book_poll_workflow, shared by chat, slash, and dashboard."""
+    if reason == "nominations_open":
+        return "Nominations are still open. Close them first, then open the poll."
+    return "A book poll is already open, or there's no new closed nomination round to vote on."
+
+
 def _day_phrase(days: int) -> str:
     return f"{days} day" if days == 1 else f"{days} days"
 
@@ -175,6 +182,8 @@ async def open_book_poll_workflow(guild, guild_id: str, opened_by: str, days: in
     days = _duration(guild_id, days, "poll_default_days")
     if get_active_poll(guild_id):
         return _fail("already_open")
+    if get_active_window(guild_id):
+        return _fail("nominations_open")
     poll_id, nominations = open_poll(guild_id, opened_by, days=days)
     poll_id = poll_id or 0
     if not poll_id:

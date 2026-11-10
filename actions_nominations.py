@@ -226,7 +226,8 @@ def get_nominations(guild_id: str) -> list:
 
 def open_poll(guild_id: str, opened_by: str, days: int = 7, is_tiebreaker: bool = False):
     """
-    Opens a poll for a guild. If is_tiebreaker=False, uses the most recent closed nomination window.
+    Opens a poll for a guild. If is_tiebreaker=False, uses the most recent closed nomination window,
+    refusing while a window is still open or when that window has already been polled.
     If is_tiebreaker=True, uses the active window (which should contain tiebreaker nominations).
     Returns (poll_id, list of nominations) on success.
     Returns (0, []) if no valid window exists or if a poll is already open.
@@ -250,7 +251,13 @@ def open_poll(guild_id: str, opened_by: str, days: int = 7, is_tiebreaker: bool 
                 (guild_id,)
             )
         else:
-            # For regular poll, use most recent closed window
+            # A round still taking nominations must close first; never fall back to an older round.
+            cur.execute(
+                "SELECT 1 FROM nomination_windows WHERE guild_id = ? AND status = 'open' LIMIT 1",
+                (guild_id,)
+            )
+            if cur.fetchone():
+                return (0, [])
             cur.execute(
                 "SELECT window_id FROM nomination_windows WHERE guild_id = ? AND status = 'closed' ORDER BY window_id DESC LIMIT 1",
                 (guild_id,)
@@ -260,6 +267,12 @@ def open_poll(guild_id: str, opened_by: str, days: int = 7, is_tiebreaker: bool 
         if not window_row:
             return (0, [])
         window_id = window_row[0]
+
+        # Each round is voted on once; the latest round already having a poll means nothing is pending.
+        if not is_tiebreaker:
+            cur.execute("SELECT 1 FROM polls WHERE window_id = ? LIMIT 1", (window_id,))
+            if cur.fetchone():
+                return (0, [])
 
         # Fetch nominations for this window
         noms = _fetch_window_nominations(conn, window_id)

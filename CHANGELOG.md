@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-11-09] (Poll rounds, inactivity nudges, startup resilience)
+
+### Fixed
+- Opening a book poll no longer picks an older, already-voted round. It refuses while nominations are still open ("Close them first") and never re-polls a round that already had a poll. Applies to chat, `/poll open`, and the dashboard.
+- Inactivity nudges now actually go out. The sweep runs daily at the guild's weekly-recap hour instead of on a 14-day interval that restarted on every startup, reconnect, and dashboard save. The "nudge interval hours" setting is now the minimum gap before the same stale book is nudged again (default 336 hours, unchanged from the previous effective behaviour).
+- A failing startup step (e.g. a missing channel permission while closing an expired poll) no longer skips the steps after it. Each guild and each step is isolated and logged, so reminders, year-in-review, and taste-profile schedules are always set up.
+
 ## [2026-10-15] (Bot role mentions)
 
 ### Fixed
