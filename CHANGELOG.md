@@ -10,6 +10,8 @@ announce: true
 ### Fixed
 - Repeating a finish keeps the original completion and no longer inflates reading goals or leaderboards. Start the book again to log a reread.
 - Starting a book again or marking it DNF keeps earlier completed reads in your history.
+- Anthropic replies can include thinking blocks before the response text. The bot now reads the first text block and uses its normal fallback when no text is available.
+- Provider clients retry transient failures up to twice with backoff. The 30-second SDK timeout applies per attempt.
 
 ## [2026-11-09] (Poll rounds, inactivity nudges, startup resilience)
 
