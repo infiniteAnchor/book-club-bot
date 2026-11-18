@@ -155,7 +155,7 @@ Discord message → bot.py → llm.py (LLM: intent + response) → actions.py �
 - Chat replies: Claude writes the response. Slash commands, dashboard, enrollment, and vote toasts are Python-owned embeds
 - Natural-language-first: all book-club actions work via chat; `/commands` support or offer alternatives to the same actions
 - Errors funnel through `errors.py`: logs keep full tracebacks + context; Discord only ever receives static friendly fallbacks (`errors.FRIENDLY_ERROR_MESSAGE`)
-- LLM calls from chat and scheduled jobs run on a dedicated pool of up to four workers. Provider requests use a 30-second SDK timeout with automatic retries disabled; this is a network timeout, not an end-to-end deadline. Messages from the same reader in a guild are processed in order.
+- LLM calls from chat and scheduled jobs run on a dedicated pool of up to four workers. Provider requests use a 30-second SDK network timeout and up to two retries on transient errors. The timeout applies to each attempt. Retry delays, including any `Retry-After` honored by the SDK, add to the total wait. Messages from the same reader in a guild are processed in order.
 - Google Books metadata is fetched off the event loop before book actions run; SQLite mutations remain synchronous. Interactions defer before slow lookups, and existing book metadata is reused.
 
 ### Performance logs

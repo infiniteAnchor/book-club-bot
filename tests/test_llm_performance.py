@@ -99,7 +99,7 @@ def test_concurrent_requests_have_separate_counts_and_safe_logs(caplog):
 
 
 @pytest.mark.parametrize("provider", ["anthropic", "openai", "deepseek"])
-def test_provider_clients_have_explicit_timeout_and_no_automatic_retries(provider):
+def test_provider_clients_have_explicit_timeout_and_bounded_retries(provider):
     target = "anthropic.Anthropic" if provider == "anthropic" else "openai.OpenAI"
     with mock.patch.object(llm, "LLM_PROVIDER", provider), \
          mock.patch.object(llm, "_clients", {}), mock.patch(target) as constructor:
@@ -107,14 +107,14 @@ def test_provider_clients_have_explicit_timeout_and_no_automatic_retries(provide
         llm._get_client()
     constructor.assert_called_once()
     assert constructor.call_args.kwargs["timeout"] == 30.0
-    assert constructor.call_args.kwargs["max_retries"] == 0
+    assert constructor.call_args.kwargs["max_retries"] == 2
 
 
 @pytest.mark.parametrize("provider", ["anthropic", "openai"])
 def test_actual_provider_call_records_usage_and_failure(provider, caplog):
     usage = SimpleNamespace(input_tokens=12, output_tokens=4, prompt_tokens=12, completion_tokens=4)
     response = SimpleNamespace(
-        usage=usage, content=[SimpleNamespace(text="private response")],
+        usage=usage, content=[SimpleNamespace(type="text", text="private response")],
         choices=[SimpleNamespace(message=SimpleNamespace(content="private response"))],
     )
     client = mock.Mock()
@@ -140,7 +140,7 @@ def test_actual_provider_call_records_usage_and_failure(provider, caplog):
 def _anthropic_client(usage):
     client = mock.Mock()
     client.messages.create.return_value = SimpleNamespace(
-        usage=usage, content=[SimpleNamespace(text="{}")],
+        usage=usage, content=[SimpleNamespace(type="text", text="{}")],
     )
     return client
 
@@ -189,3 +189,24 @@ def test_cache_token_usage_is_logged(caplog):
          mock.patch.object(llm, "_get_client", return_value=_anthropic_client(usage)):
         llm._call_llm("system", "prompt", 10, cache_system=True)
     assert "cache_read_tokens=2500 cache_write_tokens=0" in caplog.text
+
+
+def test_anthropic_reply_skips_leading_thinking_block():
+    content = [
+        SimpleNamespace(type="thinking", thinking="private reasoning"),
+        SimpleNamespace(type="text", text='{"intent": "query"}'),
+    ]
+    assert llm._first_text_block(content) == '{"intent": "query"}'
+
+
+def test_anthropic_reply_without_text_block_uses_chat_fallback():
+    client = _anthropic_client(None)
+    client.messages.create.return_value.content = [
+        SimpleNamespace(type="thinking", thinking="private reasoning"),
+    ]
+    with mock.patch.object(llm, "LLM_PROVIDER", "anthropic"), \
+         mock.patch.object(llm, "_get_client", return_value=client):
+        intents = llm.get_intents("What am I reading?", {})
+    assert len(intents) == 1
+    assert intents[0]["action"] == "unknown"
+    assert "trouble reaching the book brain" in intents[0]["response"]

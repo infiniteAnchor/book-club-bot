@@ -19,6 +19,7 @@ _client_lock = Lock()
 _error_loop = ContextVar("llm_error_loop", default=None)
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="bookclub-llm")
 LLM_TIMEOUT_SECONDS = 30.0
+LLM_MAX_RETRIES = 2
 
 
 async def run(function, *args, **kwargs):
@@ -106,12 +107,12 @@ def _get_client_locked():
         return _clients[provider]
     if provider == "anthropic":
         import anthropic
-        _clients[provider] = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=LLM_TIMEOUT_SECONDS, max_retries=0)
+        _clients[provider] = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=LLM_TIMEOUT_SECONDS, max_retries=LLM_MAX_RETRIES)
     elif provider in ("openai", "deepseek"):
         from openai import OpenAI
         api_key = OPENAI_API_KEY if provider == "openai" else DEEPSEEK_API_KEY
         base_url = "https://api.deepseek.com" if provider == "deepseek" else None
-        _clients[provider] = OpenAI(api_key=api_key, timeout=LLM_TIMEOUT_SECONDS, max_retries=0, **({"base_url": base_url} if base_url else {}))
+        _clients[provider] = OpenAI(api_key=api_key, timeout=LLM_TIMEOUT_SECONDS, max_retries=LLM_MAX_RETRIES, **({"base_url": base_url} if base_url else {}))
     else:
         raise ValueError(f"Unknown LLM_PROVIDER: {provider}")
     return _clients[provider]
@@ -125,6 +126,15 @@ def _anthropic_system(system: str, system_suffix: str, cache_system: bool):
     if system_suffix:
         blocks.append({"type": "text", "text": system_suffix})
     return blocks
+
+
+def _first_text_block(content) -> str:
+    """Return the first text block; thinking or tool blocks may come before it."""
+    for block in content or ():
+        if getattr(block, "type", None) == "text":
+            return block.text
+    types = [getattr(block, "type", None) for block in content or ()]
+    raise ValueError(f"Anthropic response had no text block (block types: {types})")
 
 
 def _call_llm(system: str, prompt: str, max_tokens: int, system_suffix: str = "", cache_system: bool = False) -> str:
@@ -152,7 +162,7 @@ def _call_llm(system: str, prompt: str, max_tokens: int, system_suffix: str = ""
             output_tokens = getattr(usage, "output_tokens", 0)
             cache_read_tokens = getattr(usage, "cache_read_input_tokens", 0)
             cache_write_tokens = getattr(usage, "cache_creation_input_tokens", 0)
-            return msg.content[0].text
+            return _first_text_block(msg.content)
         else:
             msg = client.chat.completions.create(
                 model=model,
