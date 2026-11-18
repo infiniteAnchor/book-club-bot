@@ -292,6 +292,9 @@ class GoodreadsImportTests(unittest.TestCase):
         self.assertTrue(
             action_finish_book(self.user[0], self.user[1], self.guild, {"title": "Recent Finish"})
         )
+        self.assertIsNone(
+            action_finish_book(self.user[0], self.user[1], self.guild, {"title": "Recent Finish"})
+        )
         self.assertTrue(
             action_finish_book(
                 self.user[0], self.user[1], self.guild, {"title": "The Left Hand of Darkness"}

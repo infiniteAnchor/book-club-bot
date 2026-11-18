@@ -294,12 +294,13 @@ def action_start_book(discord_id: str, display_name: str, guild_id: str, args: d
     conn = connect()
     try:
         user_id = get_or_create_user(conn, discord_id, display_name)
-        book_id = get_or_create_book(conn, title, author)
+        conn.execute("BEGIN IMMEDIATE")
+        book_id = get_or_create_book(conn, title, author, commit=False)
         cur = conn.cursor()
         now = datetime.now(timezone.utc)
         existing = _latest_progress_row(cur, user_id, book_id, guild_id)
         if existing:
-            progress_id, status, source = existing
+            progress_id, status, _source = existing
             if status == 'wishlist':
                 # Move wishlist entry to reading
                 cur.execute(
@@ -312,20 +313,9 @@ def action_start_book(discord_id: str, display_name: str, guild_id: str, args: d
                 conn.commit()
                 log_event(discord_id, guild_id, "start_book", {"title": title, "author": author, "moved_from_wishlist": True})
                 return True
-            if status == 'finished' and source == GOODREADS_SOURCE:
-                cur.execute(
-                    """INSERT INTO reading_progress
-                       (user_id, book_id, guild_id, status, started_at, last_activity_at)
-                       VALUES (?, ?, ?, 'reading', ?, ?)""",
-                    (user_id, book_id, guild_id, now, now)
-                )
-                record_reading_activity(cur, user_id, guild_id, now)
-                conn.commit()
-                log_event(discord_id, guild_id, "start_book", {"title": title, "author": author})
+            if status == 'reading':
                 return True
-            # If already reading or Discord-finished, do nothing
-            return True
-        # Not on any shelf yet — create as reading
+        # A fresh attempt keeps past finishes and abandoned attempts intact.
         cur.execute(
             """INSERT INTO reading_progress
                (user_id, book_id, guild_id, status, started_at, last_activity_at)
@@ -403,7 +393,11 @@ def action_add_to_wishlist(discord_id: str, display_name: str, guild_id: str, ar
     return ok
 
 
-def action_finish_book(discord_id: str, display_name: str, guild_id: str, args: dict) -> bool:
+def action_finish_book(
+    discord_id: str, display_name: str, guild_id: str, args: dict, *,
+    expected_progress_id: int | None = None,
+) -> bool | None:
+    """Return True for a new finish, None for a repeat, or False for invalid input."""
     title = args.get("title")
     if not title or not guild_id:
         return False
@@ -411,40 +405,43 @@ def action_finish_book(discord_id: str, display_name: str, guild_id: str, args: 
     conn = connect()
     try:
         user_id = get_or_create_user(conn, discord_id, display_name)
-        book_id = get_or_create_book(conn, title, author)
+        conn.execute("BEGIN IMMEDIATE")
+        book_id = get_or_create_book(conn, title, author, commit=False)
         cur = conn.cursor()
         now = datetime.now(timezone.utc)
         existing = _latest_progress_row(cur, user_id, book_id, guild_id)
-        if existing:
-            progress_id, status, _source = existing
-            if status == 'finished':
-                # Re-read — create a new entry and increment read_count
-                cur.execute(
-                    "SELECT read_count FROM reading_progress WHERE progress_id = ?",
-                    (progress_id,)
-                )
-                read_count = cur.fetchone()[0] + 1
-                cur.execute(
-                    """INSERT INTO reading_progress
-                       (user_id, book_id, guild_id, status, read_count, started_at, finished_at, last_activity_at)
-                       VALUES (?, ?, ?, 'finished', ?, ?, ?, ?)""",
-                    (user_id, book_id, guild_id, read_count, now, now, now)
-                )
-            else:
-                # Move current entry to finished
-                cur.execute(
-                    """UPDATE reading_progress
-                       SET status = 'finished', finished_at = ?, last_activity_at = ?, last_nudged_at = NULL
-                       WHERE progress_id = ?""",
-                    (now, now, progress_id)
-                )
+        status = existing[1] if existing else None
+        if expected_progress_id is not None and (
+            status != "reading" or existing[0] != expected_progress_id
+        ):
+            return False
+
+        cur.execute(
+            """SELECT COALESCE(MAX(read_count), 0),
+                      COUNT(CASE WHEN COALESCE(source, '') != ? THEN 1 END)
+               FROM reading_progress
+               WHERE user_id = ? AND book_id = ? AND guild_id = ? AND status = 'finished'""",
+            (GOODREADS_SOURCE, user_id, book_id, guild_id),
+        )
+        prior_read_count, club_finishes = cur.fetchone()
+        if club_finishes and status != "reading":
+            return None
+        read_count = prior_read_count + 1
+        if existing and status != "finished":
+            cur.execute(
+                """UPDATE reading_progress
+                   SET status = 'finished', read_count = ?, finished_at = ?,
+                       last_activity_at = ?, last_nudged_at = NULL
+                   WHERE progress_id = ?""",
+                (read_count, now, now, existing[0]),
+            )
         else:
-            # Not tracked at all — add and immediately finish
+            # A first club finish can be logged directly, including after an import.
             cur.execute(
                 """INSERT INTO reading_progress
-                   (user_id, book_id, guild_id, status, started_at, finished_at, last_activity_at)
-                   VALUES (?, ?, ?, 'finished', ?, ?, ?)""",
-                (user_id, book_id, guild_id, now, now, now)
+                   (user_id, book_id, guild_id, status, read_count, started_at, finished_at, last_activity_at)
+                   VALUES (?, ?, ?, 'finished', ?, ?, ?, ?)""",
+                (user_id, book_id, guild_id, read_count, now, now, now),
             )
         record_reading_activity(cur, user_id, guild_id, now)
         conn.commit()
@@ -454,51 +451,43 @@ def action_finish_book(discord_id: str, display_name: str, guild_id: str, args: 
         conn.close()
 
 
-def action_dnf_book(discord_id: str, display_name: str, guild_id: str, args: dict):
-    """
-    Marks a book as DNF (did not finish). Returns (success, title, author).
-    """
+def action_dnf_book(
+    discord_id: str, display_name: str, guild_id: str, args: dict, *,
+    expected_progress_id: int | None = None,
+):
+    """Mark the current attempt DNF. Returns (success, title, author)."""
     title = args.get("title")
-    if not title:
+    if not title or not guild_id:
         return False, None, None
     author = args.get("author")
     conn = connect()
     try:
         user_id = get_or_create_user(conn, discord_id, display_name)
-        book_id = get_or_create_book(conn, title, author)
+        conn.execute("BEGIN IMMEDIATE")
+        book_id = get_or_create_book(conn, title, author, commit=False)
         cur = conn.cursor()
         now = datetime.now(timezone.utc)
-        cur.execute(
-            """SELECT progress_id, status, source FROM reading_progress
-               WHERE user_id = ? AND book_id = ? AND guild_id = ?
-               ORDER BY progress_id DESC LIMIT 1""",
-            (user_id, book_id, guild_id)
-        )
-        existing = cur.fetchone()
-        if existing:
-            progress_id, status, source = existing
-            if status == 'dnf':
-                return False, title, author
-            if source == GOODREADS_SOURCE:
-                cur.execute(
-                    """INSERT INTO reading_progress
-                       (user_id, book_id, guild_id, status, started_at, finished_at, last_activity_at)
-                       VALUES (?, ?, ?, 'dnf', ?, ?, ?)""",
-                    (user_id, book_id, guild_id, now, now, now)
-                )
-            else:
-                cur.execute(
-                    """UPDATE reading_progress
-                       SET status = 'dnf', finished_at = ?, last_activity_at = ?, last_nudged_at = NULL
-                       WHERE progress_id = ?""",
-                    (now, now, progress_id)
-                )
+        existing = _latest_progress_row(cur, user_id, book_id, guild_id)
+        status = existing[1] if existing else None
+        if expected_progress_id is not None and (
+            status != "reading" or existing[0] != expected_progress_id
+        ):
+            return False, title, author
+        if status == "dnf":
+            return False, title, author
+        if existing and status != "finished":
+            cur.execute(
+                """UPDATE reading_progress
+                   SET status = 'dnf', finished_at = ?, last_activity_at = ?, last_nudged_at = NULL
+                   WHERE progress_id = ?""",
+                (now, now, existing[0]),
+            )
         else:
             cur.execute(
                 """INSERT INTO reading_progress
                    (user_id, book_id, guild_id, status, started_at, finished_at, last_activity_at)
                    VALUES (?, ?, ?, 'dnf', ?, ?, ?)""",
-                (user_id, book_id, guild_id, now, now, now)
+                (user_id, book_id, guild_id, now, now, now),
             )
         record_reading_activity(cur, user_id, guild_id, now)
         conn.commit()
