@@ -6,6 +6,14 @@ BCB-001 through BCB-010 are resolved. Patch order for remaining product work:
 
 # Resolved
 
+## BCB-011 — Shelf actions can duplicate or overwrite completed reads
+
+**Found:** 2026-11-09 code review, item 3
+
+Repeating a finish created another completed row and inflated goal and leaderboard counts. Starting a previously finished or abandoned title did not open a new attempt, and marking a finished title DNF overwrote its finish.
+
+Starting again now opens a new attempt. A repeated finish leaves the prior completion alone, and DNF preserves completed rows. Goodreads imports remain separate from club finishes. The wishlist reply issue from the same review item is still open.
+
 ## BCB-010 — Reading streaks cannot grow past one day
 
 **Status:** Resolved 2026-09-26

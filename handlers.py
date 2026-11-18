@@ -256,6 +256,10 @@ def _next_book_view(ctx: RequestContext):
 
 async def _handle_finish_book(ctx: RequestContext, args, intent, _ctx):
     ok = await run_book_action(action_finish_book, ctx.author_id, ctx.display_name, ctx.guild_id, args)
+    if ok is None:
+        title = args["title"]
+        await _notice(ctx, f"**{title}** is already marked as finished. To log a reread, start the book again first.")
+        return
     if ok:
         new_ach = check_achievements(ctx.author_id, ctx.display_name, ctx.guild_id)
         if new_ach:

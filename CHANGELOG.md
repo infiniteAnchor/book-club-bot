@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-11-18] (Reading history)
+announce: true
+
+### Announcement
+- If you log a finish twice, it counts once. To log a reread, tell the bot you're starting the book again, then log the new finish.
+- Marking a book as did not finish (DNF) keeps any earlier finishes in your reading history.
+
+### Fixed
+- Repeating a finish keeps the original completion and no longer inflates reading goals or leaderboards. Start the book again to log a reread.
+- Starting a book again or marking it DNF keeps earlier completed reads in your history.
+
 ## [2026-11-09] (Poll rounds, inactivity nudges, startup resilience)
 
 ### Fixed

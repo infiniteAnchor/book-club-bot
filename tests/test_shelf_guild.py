@@ -12,12 +12,14 @@ import database
 from actions import (
     action_add_book,
     action_add_to_wishlist,
+    action_dnf_book,
     action_finish_book,
     action_start_book,
     action_update_progress,
     get_user_book_progress,
     query_shelf,
 )
+from actions_engagement import action_set_goal, get_goal_progress, get_leaderboard_stats
 from actions_queue import LIST_CAP, action_wishlist_add
 from database import connect
 
@@ -79,6 +81,56 @@ class ShelfGuildScopeTests(unittest.TestCase):
         assert in_a is not None and in_b is not None
         self.assertEqual(in_a["status"], "reading")
         self.assertEqual(in_b["status"], "finished")
+
+    def test_finish_is_repeat_safe_and_new_attempt_counts_as_reread(self):
+        uid, name = self.alice
+        args = {"title": "Dune"}
+        action_set_goal(uid, name, {"goal": 10})
+        self.assertIs(action_finish_book(uid, name, self.guild_a, args), True)
+        self.assertIsNone(action_finish_book(uid, name, self.guild_a, args))
+        self.assertEqual(self._rows("Dune"), [(self.guild_a, "finished", None)])
+        self.assertEqual(get_goal_progress(uid, self.guild_a)["progress"], 1)
+        self.assertEqual(get_leaderboard_stats(self.guild_a)[0]["books_finished"], 1)
+
+        self.assertTrue(action_dnf_book(uid, name, self.guild_a, args)[0])
+        self.assertIsNone(action_finish_book(uid, name, self.guild_a, args))
+        self.assertEqual(self._rows("Dune"), [
+            (self.guild_a, "finished", None), (self.guild_a, "dnf", None),
+        ])
+        self.assertEqual(get_goal_progress(uid, self.guild_a)["progress"], 1)
+        self.assertEqual(get_leaderboard_stats(self.guild_a)[0]["books_finished"], 1)
+
+        self.assertTrue(action_start_book(uid, name, self.guild_a, args))
+        attempt = get_user_book_progress(uid, "Dune", self.guild_a)
+        self.assertEqual(attempt["status"], "reading")
+        self.assertIs(action_finish_book(uid, name, self.guild_a, args), True)
+        self.assertTrue(action_start_book(uid, name, self.guild_a, args))
+        self.assertFalse(action_finish_book(
+            uid, name, self.guild_a, args, expected_progress_id=attempt["progress_id"],
+        ))
+        self.assertFalse(action_dnf_book(
+            uid, name, self.guild_a, args, expected_progress_id=attempt["progress_id"],
+        )[0])
+        self.assertEqual(get_goal_progress(uid, self.guild_a)["progress"], 2)
+        self.assertEqual(get_leaderboard_stats(self.guild_a)[0]["books_finished"], 2)
+        self.assertEqual(get_user_book_progress(uid, "Dune", self.guild_a)["status"], "reading")
+
+    def test_repeated_finish_in_chat_reports_existing_completion(self):
+        import handlers
+
+        uid, name = self.alice
+        args = {"title": "Dune"}
+        self.assertIs(action_finish_book(uid, name, self.guild_a, args), True)
+        ctx = handlers.RequestContext(
+            message=mock.Mock(), guild_id=self.guild_a, author_id=uid,
+            display_name=name, reply_channel=mock.Mock(),
+        )
+        with mock.patch.object(handlers, "_notice", new_callable=mock.AsyncMock) as notice, \
+             mock.patch.object(handlers, "check_achievements") as achievements:
+            asyncio.run(handlers._handle_finish_book(ctx, args, {"response": "Finished!"}, None))
+        notice.assert_awaited_once()
+        self.assertIn("already marked as finished", notice.await_args.args[1])
+        achievements.assert_not_called()
 
     def test_add_book_does_not_no_op_on_other_guild_row(self):
         uid, name = self.alice

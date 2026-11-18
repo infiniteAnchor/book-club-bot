@@ -130,7 +130,9 @@ check("status is reading (not wishlist)", any(b["title"] == "The Road" for b in 
 section("3. Re-read")
 
 ok = action_finish_book(ALICE["id"], ALICE["name"], GUILD, {"title": "Dune"})
-check("finish_book again succeeds", ok)
+check("repeating finish reports the existing completion", ok is None)
+check("start a reread", action_start_book(ALICE["id"], ALICE["name"], GUILD, {"title": "Dune"}))
+check("finish the reread", action_finish_book(ALICE["id"], ALICE["name"], GUILD, {"title": "Dune"}))
 
 row = db_query(
     "SELECT MAX(read_count) FROM reading_progress rp JOIN books b ON b.book_id = rp.book_id WHERE b.title = 'Dune'"

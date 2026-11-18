@@ -217,6 +217,7 @@ class BookActionView(errors.SafeUIMixin, discord.ui.View):
         ok = await run_book_action(action_finish_book,
             str(interaction.user.id), str(interaction.user.display_name), self.guild_id,
             {"title": self.title, "author": self.author},
+            expected_progress_id=progress["progress_id"],
         )
         if not ok:
             await interaction.followup.send("I couldn't mark that book finished. Try again.", ephemeral=True)
@@ -249,6 +250,7 @@ class BookActionView(errors.SafeUIMixin, discord.ui.View):
         ok, _, _ = await run_book_action(action_dnf_book,
             str(interaction.user.id), str(interaction.user.display_name), self.guild_id,
             {"title": self.title, "author": self.author},
+            expected_progress_id=progress["progress_id"],
         )
         if not ok:
             await interaction.followup.send("I couldn't mark that book as DNF'd. Try again.", ephemeral=True)
